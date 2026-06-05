@@ -12,9 +12,18 @@ export default async function Home() {
 
   const { data: items } = await supabase
     .from('content_item')
-    .select('id, title, content_type, scheduled_at, status, channel:channel_id ( type, label )')
+    .select('id, title, content_type, scheduled_at, status, current_version_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no )')
     .eq('client_id', HOTEL_VALENTINA)
     .order('scheduled_at')
+
+  // Body is versioned — resolve each item's current version (or the latest) server-side.
+  const posts = (items ?? []).map((it: any) => {
+    const versions = it.versions ?? []
+    const current =
+      versions.find((v: any) => v.id === it.current_version_id) ??
+      [...versions].sort((a: any, b: any) => b.version_no - a.version_no)[0]
+    return { ...it, body: current?.body ?? null }
+  })
 
   return (
     <main className="max-w-[1240px] mx-auto p-6 bg-[#FBFBFC] min-h-screen text-[#15171C]">
@@ -25,7 +34,7 @@ export default async function Home() {
         </div>
         <LogoutButton />
       </div>
-      <Calendar items={(items as any) ?? []} />
+      <Calendar items={posts} />
     </main>
   )
 }

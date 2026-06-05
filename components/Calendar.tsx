@@ -1,14 +1,19 @@
-type Item = {
+'use client'
+import { useState } from 'react'
+import Drawer from './Drawer'
+
+export type Item = {
   id: string
   title: string | null
   content_type: string
   scheduled_at: string | null
   status: string
+  body: string | null
   channel: { type: string; label: string | null } | null
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const STATUS: Record<string, { dot: string; label: string }> = {
+export const STATUS: Record<string, { dot: string; label: string }> = {
   approved:          { dot: '#16A34A', label: 'Approved' },
   scheduled:         { dot: '#3B82F6', label: 'Scheduled' },
   client_review:     { dot: '#E8920C', label: 'Awaiting client' },
@@ -20,6 +25,8 @@ const STATUS: Record<string, { dot: string; label: string }> = {
 function mondayIndex(d: Date) { return (d.getDay() + 6) % 7 }
 
 export default function Calendar({ items }: { items: Item[] }) {
+  const [selected, setSelected] = useState<Item | null>(null)
+
   const cols: Item[][] = [[], [], [], [], [], [], []]
   for (const it of items) {
     if (!it.scheduled_at) continue
@@ -44,7 +51,11 @@ export default function Calendar({ items }: { items: Item[] }) {
                 ? new Date(it.scheduled_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
                 : ''
               return (
-                <div key={it.id} className="border border-[#ECECEE] rounded-xl bg-white shadow-sm hover:shadow-md transition p-3">
+                <button
+                  key={it.id}
+                  onClick={() => setSelected(it)}
+                  className="text-left border border-[#ECECEE] rounded-xl bg-white shadow-sm hover:shadow-md transition p-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#15171C]/15"
+                >
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[12px] font-semibold capitalize">{it.channel?.type ?? it.content_type}</span>
                     <span className="text-[11px] text-[#9398A1]">{time}</span>
@@ -54,12 +65,14 @@ export default function Calendar({ items }: { items: Item[] }) {
                     <span className="w-2 h-2 rounded-full" style={{ background: s.dot }} />
                     {s.label}
                   </div>
-                </div>
+                </button>
               )
             })}
           </div>
         ))}
       </div>
+
+      <Drawer item={selected} onClose={() => setSelected(null)} />
     </div>
   )
 }
