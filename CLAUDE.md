@@ -36,15 +36,21 @@ Out of scope (do NOT build): publishing/scheduling to social networks, analytics
 agency, client, membership (user↔scope, role), channel (per client: instagram/facebook/linkedin/blog/newsletter), content_item, content_version, asset, comment, approval_event, agency_integration.
 Seeded: agency `…0001`, client "Hotel Valentina" `…0002`, channels a1–a5.
 
+CRM extensions (priority 1, not yet built):
+- `client` (extended): status (prospect/active/paused/archived), website, industry, account_owner_id, notes, billing_email, vat_number, billing_address, payment_terms, currency (default EUR), retainer_amount.
+- `client_contact`: client_id, name, email, phone, role, is_primary, user_id (nullable — links to a portal user via membership).
+- `brand_asset`: client_id, kind (logo/colour/font/guideline/other), label, value/url, notes.
+
 ## Approval state machine (content_item.status)
 draft → internal_review → client_review → changes_requested → approved → scheduled → posted.
 Agency drives draft→internal_review→client_review. Client view can approve (→approved) or request changes (→changes_requested). Every transition writes an approval_event row.
 
 ## Built
-Auth (magic link), RLS isolation, calendar rendering live data. Currently read-only.
+Auth (magic link), RLS isolation, calendar rendering live data.
+- Click a calendar post → read-only detail drawer (title, body, channel, scheduled date, status). Body is versioned (content_version); resolved server-side from current_version_id.
 
 ## Next (priority order)
-1. Click a calendar post → detail drawer (read).
+1. Client CRM — agency-only admin at `/clients` to manage clients. Adds to `client`: status (prospect/active/paused/archived), website, industry, account_owner_id, notes, and billing (billing_email, vat_number, billing_address, payment_terms, currency default EUR, retainer_amount). New `client_contact` table (client_id, name, email, phone, role, is_primary, user_id nullable for portal access via membership). New `brand_asset` table (client_id, kind [logo/colour/font/guideline/other], label, value/url, notes). Build in sub-steps: schema → clients list → new/edit form → contacts → brand assets.
 2. Create / edit a post (title, body, channel, scheduled date, status).
 3. Approval buttons + status transitions (agency side), writing approval_event.
 4. Client view: read-only calendar for one client + approve / request-changes + comment.
