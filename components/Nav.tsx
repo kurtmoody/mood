@@ -4,9 +4,10 @@ import LogoutButton from './LogoutButton'
 const TABS = [
   { href: '/', key: 'calendar', label: 'Calendar' },
   { href: '/clients', key: 'clients', label: 'Clients' },
+  { href: '/team', key: 'team', label: 'Team' },
 ] as const
 
-export default function Nav({ current }: { current: 'calendar' | 'clients' }) {
+export default function Nav({ current }: { current: 'calendar' | 'clients' | 'team' }) {
   return (
     <div className="flex items-center justify-between mb-5">
       <nav className="flex items-center gap-1">
