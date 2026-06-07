@@ -1,19 +1,40 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Calendar from '@/components/Calendar'
-import Nav from '@/components/Nav'
+import PageShell from '@/components/PageShell'
+import ClientSwitcher from '@/components/ClientSwitcher'
 
-const HOTEL_VALENTINA = '00000000-0000-0000-0000-000000000002'
-
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ client?: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Clients the user can see (RLS scopes to their agency's clients).
+  const { data: clients } = await supabase
+    .from('client')
+    .select('id, name')
+    .order('name')
+  const clientList = clients ?? []
+
+  if (clientList.length === 0) {
+    return (
+      <PageShell current="calendar">
+        <div className="border border-[#ECECEE] rounded-2xl bg-white p-12 text-center">
+          <div className="text-sm font-semibold mb-1">No clients yet</div>
+          <div className="text-sm text-[#5A5E66]">Add a client to start planning content.</div>
+        </div>
+      </PageShell>
+    )
+  }
+
+  // Selected client from ?client=, falling back to the first one.
+  const { client: requested } = await searchParams
+  const selected = clientList.find((c) => c.id === requested) ?? clientList[0]
+
   const { data: items } = await supabase
     .from('content_item')
     .select('id, title, content_type, scheduled_at, status, current_version_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no )')
-    .eq('client_id', HOTEL_VALENTINA)
+    .eq('client_id', selected.id)
     .order('scheduled_at')
 
   // Body is versioned — resolve each item's current version (or the latest) server-side.
@@ -26,13 +47,12 @@ export default async function Home() {
   })
 
   return (
-    <main className="max-w-[1240px] mx-auto p-6 bg-[#FBFBFC] min-h-screen text-[#15171C]">
-      <Nav current="calendar" />
+    <PageShell current="calendar">
       <div className="mb-5">
-        <div className="text-xl font-bold">Hotel Valentina</div>
-        <div className="text-sm text-[#5A5E66]">Content calendar · this week</div>
+        <ClientSwitcher clients={clientList} current={selected.id} />
+        <div className="text-sm text-[#5A5E66] mt-1.5">Content calendar · this week</div>
       </div>
       <Calendar items={posts} />
-    </main>
+    </PageShell>
   )
 }

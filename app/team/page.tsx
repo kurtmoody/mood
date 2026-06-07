@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import Nav from '@/components/Nav'
+import PageShell from '@/components/PageShell'
 import AddTeamMemberForm from './AddTeamMemberForm'
 
 type Member = {
@@ -30,8 +30,7 @@ export default async function TeamPage() {
   const rows = (members as Member[] | null) ?? []
 
   return (
-    <main className="max-w-[1240px] mx-auto p-6 bg-[#FBFBFC] min-h-screen text-[#15171C]">
-      <Nav current="team" />
+    <PageShell current="team">
       <div className="mb-5">
         <div className="text-xl font-bold">Team</div>
         <div className="text-sm text-[#5A5E66]">{rows.length} {rows.length === 1 ? 'member' : 'members'}</div>
@@ -72,6 +71,6 @@ export default async function TeamPage() {
 
         <AddTeamMemberForm />
       </div>
-    </main>
+    </PageShell>
   )
 }

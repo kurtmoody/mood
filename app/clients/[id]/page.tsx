@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import Nav from '@/components/Nav'
+import PageShell from '@/components/PageShell'
 import EditClientForm from './EditClientForm'
 import ContactsSection, { type Contact } from './ContactsSection'
 import BrandAssetsSection, { type BrandAsset } from './BrandAssetsSection'
@@ -77,8 +77,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
   }
 
   return (
-    <main className="max-w-[1240px] mx-auto p-6 bg-[#FBFBFC] min-h-screen text-[#15171C]">
-      <Nav current="clients" />
+    <PageShell current="clients">
       <div className="mb-5">
         <div className="text-xl font-bold">{client.name}</div>
         <div className="text-sm text-[#5A5E66]">Edit client</div>
@@ -92,6 +91,6 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
       <div className="max-w-[680px] mt-10">
         <BrandAssetsSection clientId={client.id} assets={(assets as BrandAsset[] | null) ?? []} />
       </div>
-    </main>
+    </PageShell>
   )
 }

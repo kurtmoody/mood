@@ -34,17 +34,19 @@ export default function Calendar({ items }: { items: Item[] }) {
   }
 
   return (
-    <div className="border border-[#ECECEE] rounded-2xl bg-white overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-[#ECECEE]">
+    <div className="w-full border border-[#ECECEE] rounded-2xl bg-white overflow-hidden">
+      <div className="overflow-x-auto">
+        <div className="min-w-[900px]">
+          <div className="grid grid-cols-7 border-b border-[#ECECEE]">
         {DAYS.map((d) => (
           <div key={d} className="px-3 py-2.5 text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold border-r border-[#ECECEE] last:border-r-0">
             {d}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 min-h-[520px]">
+      <div className="grid grid-cols-7">
         {cols.map((dayItems, i) => (
-          <div key={i} className="border-r border-[#ECECEE] last:border-r-0 p-2 flex flex-col gap-2">
+          <div key={i} className="min-h-[520px] border-r border-[#ECECEE] last:border-r-0 p-2 flex flex-col gap-2">
             {dayItems.map((it) => {
               const s = STATUS[it.status] ?? STATUS.draft
               const time = it.scheduled_at
@@ -70,6 +72,8 @@ export default function Calendar({ items }: { items: Item[] }) {
             })}
           </div>
         ))}
+          </div>
+        </div>
       </div>
 
       <Drawer item={selected} onClose={() => setSelected(null)} />
