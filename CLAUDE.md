@@ -37,10 +37,10 @@ Out of scope (do NOT build): publishing/scheduling to social networks, analytics
 agency, client, membership (user↔scope, role), channel (per client: instagram/facebook/linkedin/blog/newsletter), content_item, content_version, asset, comment, approval_event, agency_integration.
 Seeded: agency `…0001`, client "Hotel Valentina" `…0002`, channels a1–a5.
 
-CRM tables (migrations 0001–0005):
+CRM tables (migrations 0001–0008):
 - `client` (+ non-sensitive only): status (prospect/active/paused/archived, CHECK), website, industry. Sensitive data is NOT on `client` (it's client-readable once the portal exists).
-- `client_internal` (agency-only, 1:1 with client): account_owner_id, notes, billing_email, vat_number, billing_address, payment_terms, currency (default EUR), retainer_amount. account_owner sourced from `team_member` (sub-step b).
-- `client_contact` (agency-only): client_id, name (→ first_name/surname in sub-step c), email, phone, role, is_primary, user_id (nullable — links to a portal user via membership).
+- `client_internal` (agency-only, 1:1 with client): account_owner_id (→ team_member), notes, billing_email, vat_number, billing_address, payment_terms, currency (default EUR), retainer_amount.
+- `client_contact` (agency-only): client_id, first_name, surname, role, email, phone, is_primary (single-primary enforced), user_id (nullable — links to a portal user via membership).
 - `brand_asset` (agency-only): client_id, kind (logo/colour/font/guideline/other), label, value/url, notes.
 - `team_member` (agency staff directory): agency_id, full_name, role, email, user_id (nullable → auth.users when they have a login), is_active. Foundation for account owners, assignment, @mentions, comments.
 
@@ -51,20 +51,21 @@ Agency drives draft→internal_review→client_review. Client view can approve (
 ## Built
 Auth (magic link), RLS isolation, calendar rendering live data.
 - Click a calendar post → read-only detail drawer (title, body, channel, scheduled date, status). Body is versioned (content_version); resolved server-side from current_version_id.
-- Client CRM: agency-only `/clients` list (status, industry, primary contact) + create at `/clients/new` via the atomic `create_client` RPC.
+- Client CRM (complete) — migrations 0001–0008, all writes via SECURITY DEFINER RPCs:
+  - `/clients` list + create (`create_client`); `/clients/[id]` detail/edit (`update_client`) with account owner sourced from the team directory.
+  - `/team` directory — list & add staff (`add_team_member`).
+  - Contacts CRUD on the detail page (`add_contact`/`update_contact`/`delete_contact`, single-primary enforced).
+  - Brand assets CRUD on the detail page (`add_brand_asset`/`delete_brand_asset`; colour swatch + link rendering).
 
-## Next (priority order)
-1. Client CRM — agency-only admin to manage clients. Done: [x] schema, [x] clients list (`/clients`), [x] create client (`/clients/new`). Next, in order:
-   a. Team directory — `team_member` table + `/team` page to list & add staff (via `add_team_member` RPC).
-   b. Client detail + edit page (clickable rows) with an account-owner picker sourced from `team_member`.
-   c. Contacts on the detail page (first_name, surname, role, email, phone, is_primary; later invite-to-portal → creates a client membership).
-   d. Brand assets on the detail page.
-2. Create / edit a post (title, body, channel, scheduled date, status).
-3. Approval buttons + status transitions (agency side), writing approval_event.
-4. Client view: read-only calendar for one client + approve / request-changes + comment.
-5. Comment thread on a post.
-6. Image upload (Supabase Storage) + Google Drive link on assets.
-7. Auto-chase email reminders for items stuck in client_review.
+## Next (priority order) — content engine
+1. Client-aware calendar — client switcher; the calendar shows the selected client's items + channels, selection persisted in the URL (`?client=`).
+2. Channel management per client (add / edit / remove channels).
+3. Create / edit posts (title, body, channel, scheduled date, status; body versioned via content_version).
+4. Approval actions + status transitions (agency side), writing approval_event.
+5. Comments thread on a post.
+6. Client portal — invite a contact → client login → client-scoped calendar view → approve / request changes.
+
+Later: image upload (Supabase Storage) for brand assets / posts; auto-chase email reminders for items stuck in client_review.
 
 ## Conventions / preferences
 - British English. Write like a person; avoid AI-tell phrasing. Lean and direct — no padded comments or over-engineering.
