@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import PageShell from '@/components/PageShell'
 
 const CLIENT_STATUS: Record<string, { dot: string; label: string }> = {
   prospect: { dot: '#3B82F6', label: 'Prospect' },
@@ -42,7 +41,7 @@ export default async function ClientsPage() {
   const rows = (clients as Client[] | null) ?? []
 
   return (
-    <PageShell current="clients">
+    <>
       <div className="flex items-center justify-between mb-5">
         <div>
           <div className="text-xl font-bold">Clients</div>
@@ -100,6 +99,6 @@ export default async function ClientsPage() {
           })}
         </div>
       )}
-    </PageShell>
+    </>
   )
 }

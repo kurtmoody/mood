@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Calendar from '@/components/Calendar'
-import PageShell from '@/components/PageShell'
 import ClientSwitcher from '@/components/ClientSwitcher'
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ client?: string }> }) {
@@ -18,12 +17,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
 
   if (clientList.length === 0) {
     return (
-      <PageShell current="calendar">
-        <div className="border border-[#ECECEE] rounded-2xl bg-white p-12 text-center">
-          <div className="text-sm font-semibold mb-1">No clients yet</div>
-          <div className="text-sm text-[#5A5E66]">Add a client to start planning content.</div>
-        </div>
-      </PageShell>
+      <div className="border border-[#ECECEE] rounded-2xl bg-white p-12 text-center">
+        <div className="text-sm font-semibold mb-1">No clients yet</div>
+        <div className="text-sm text-[#5A5E66]">Add a client to start planning content.</div>
+      </div>
     )
   }
 
@@ -47,12 +44,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   })
 
   return (
-    <PageShell current="calendar">
+    <>
       <div className="mb-5">
         <ClientSwitcher clients={clientList} current={selected.id} />
         <div className="text-sm text-[#5A5E66] mt-1.5">Content calendar · this week</div>
       </div>
       <Calendar items={posts} />
-    </PageShell>
+    </>
   )
 }
