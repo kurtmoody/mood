@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Nav from '@/components/Nav'
@@ -43,9 +44,17 @@ export default async function ClientsPage() {
   return (
     <main className="max-w-[1240px] mx-auto p-6 bg-[#FBFBFC] min-h-screen text-[#15171C]">
       <Nav current="clients" />
-      <div className="mb-5">
-        <div className="text-xl font-bold">Clients</div>
-        <div className="text-sm text-[#5A5E66]">{rows.length} {rows.length === 1 ? 'client' : 'clients'}</div>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <div className="text-xl font-bold">Clients</div>
+          <div className="text-sm text-[#5A5E66]">{rows.length} {rows.length === 1 ? 'client' : 'clients'}</div>
+        </div>
+        <Link
+          href="/clients/new"
+          className="text-sm bg-[#15171C] text-white rounded-lg px-3.5 py-2 font-semibold"
+        >
+          New client
+        </Link>
       </div>
 
       {rows.length === 0 ? (
