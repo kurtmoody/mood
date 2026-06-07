@@ -73,9 +73,10 @@ export default async function ClientsPage() {
             const s = CLIENT_STATUS[c.status ?? ''] ?? { dot: '#A6ABB3', label: c.status ?? 'Unknown' }
             const contact = c.primary_contact?.[0] ?? null
             return (
-              <div
+              <Link
                 key={c.id}
-                className="grid grid-cols-[1.6fr_1fr_1.6fr] gap-4 px-5 py-3.5 border-b border-[#ECECEE] last:border-b-0 items-center"
+                href={`/clients/${c.id}`}
+                className="grid grid-cols-[1.6fr_1fr_1.6fr] gap-4 px-5 py-3.5 border-b border-[#ECECEE] last:border-b-0 items-center hover:bg-[#FBFBFC] transition"
               >
                 <div className="flex items-center gap-2.5">
                   <span className="text-sm font-semibold">{c.name}</span>
@@ -95,7 +96,7 @@ export default async function ClientsPage() {
                     <span className="text-[#9398A1]">—</span>
                   )}
                 </div>
-              </div>
+              </Link>
             )
           })}
         </div>
