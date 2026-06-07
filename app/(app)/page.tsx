@@ -1,9 +1,11 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import Calendar from '@/components/Calendar'
-import ClientSwitcher from '@/components/ClientSwitcher'
+import CalendarBoard from './CalendarBoard'
+import { addDays, isDateStr, mondayOf, todayMalta, weekDates, zonedDayStartUTC } from '@/lib/week'
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ client?: string }> }) {
+type Channel = { id: string; type: string; label: string | null }
+
+export default async function Home({ searchParams }: { searchParams: Promise<{ client?: string; week?: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -24,14 +26,33 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
     )
   }
 
+  const { client: requested, week: weekParam } = await searchParams
+
   // Selected client from ?client=, falling back to the first one.
-  const { client: requested } = await searchParams
   const selected = clientList.find((c) => c.id === requested) ?? clientList[0]
+
+  // Viewed week from ?week= (snapped to its Monday), defaulting to the current Malta week.
+  const todayStr = todayMalta()
+  const monday = mondayOf(isDateStr(weekParam) ? weekParam : todayStr)
+  const days = weekDates(monday)
+  const weekStartUTC = zonedDayStartUTC(monday).toISOString()
+  const weekEndUTC = zonedDayStartUTC(addDays(monday, 7)).toISOString()
+
+  // All channels for the user's clients, grouped — powers the New post form's channel picker.
+  const { data: allChannels } = await supabase
+    .from('channel')
+    .select('id, type, label, client_id')
+  const channelsByClient: Record<string, Channel[]> = {}
+  for (const ch of allChannels ?? []) {
+    ;(channelsByClient[ch.client_id] ??= []).push({ id: ch.id, type: ch.type, label: ch.label })
+  }
 
   const { data: items } = await supabase
     .from('content_item')
     .select('id, title, content_type, scheduled_at, status, current_version_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no )')
     .eq('client_id', selected.id)
+    .gte('scheduled_at', weekStartUTC)
+    .lt('scheduled_at', weekEndUTC)
     .order('scheduled_at')
 
   // Body is versioned — resolve each item's current version (or the latest) server-side.
@@ -44,12 +65,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   })
 
   return (
-    <>
-      <div className="mb-5">
-        <ClientSwitcher clients={clientList} current={selected.id} />
-        <div className="text-sm text-[#5A5E66] mt-1.5">Content calendar · this week</div>
-      </div>
-      <Calendar items={posts} />
-    </>
+    <CalendarBoard
+      clients={clientList}
+      selectedClientId={selected.id}
+      channelsByClient={channelsByClient}
+      posts={posts}
+      monday={monday}
+      weekDates={days}
+      todayStr={todayStr}
+    />
   )
 }

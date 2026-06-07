@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Drawer from './Drawer'
+import { maltaDate } from '@/lib/week'
 
 export type Item = {
   id: string
@@ -22,31 +23,53 @@ export const STATUS: Record<string, { dot: string; label: string }> = {
   draft:             { dot: '#A6ABB3', label: 'Draft' },
 }
 
-function mondayIndex(d: Date) { return (d.getDay() + 6) % 7 }
-
-export default function Calendar({ items }: { items: Item[] }) {
+export default function Calendar({
+  items,
+  weekDates,
+  todayStr,
+  onNewPost,
+}: {
+  items: Item[]
+  weekDates: string[]
+  todayStr?: string
+  onNewPost?: (prefill: string) => void
+}) {
   const [selected, setSelected] = useState<Item | null>(null)
 
-  const cols: Item[][] = [[], [], [], [], [], [], []]
+  // Bucket posts by their actual Malta date; only this week's 7 dates render.
+  const byDate = new Map<string, Item[]>()
   for (const it of items) {
     if (!it.scheduled_at) continue
-    cols[mondayIndex(new Date(it.scheduled_at))].push(it)
+    const d = maltaDate(it.scheduled_at)
+    const arr = byDate.get(d)
+    if (arr) arr.push(it)
+    else byDate.set(d, [it])
   }
+  const cols = weekDates.map((ds) => byDate.get(ds) ?? [])
 
   return (
     <div className="w-full border border-[#ECECEE] rounded-2xl bg-white overflow-hidden">
       <div className="overflow-x-auto">
         <div className="min-w-[900px]">
           <div className="grid grid-cols-7 border-b border-[#ECECEE]">
-        {DAYS.map((d) => (
-          <div key={d} className="px-3 py-2.5 text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold border-r border-[#ECECEE] last:border-r-0">
-            {d}
-          </div>
-        ))}
+        {DAYS.map((d, i) => {
+          const isToday = weekDates[i] === todayStr
+          const dayNum = weekDates[i] ? Number(weekDates[i].slice(8, 10)) : ''
+          return (
+            <div key={d} className={`flex items-center gap-1.5 px-3 py-2.5 text-[11px] uppercase tracking-wide font-semibold border-r border-[#ECECEE] last:border-r-0 ${isToday ? 'text-[#15171C]' : 'text-[#9398A1]'}`}>
+              <span>{d}</span>
+              <span className={isToday ? 'inline-grid place-items-center w-5 h-5 rounded-full bg-[#15171C] text-white' : 'text-[#5A5E66]'}>{dayNum}</span>
+            </div>
+          )
+        })}
       </div>
       <div className="grid grid-cols-7">
         {cols.map((dayItems, i) => (
-          <div key={i} className="min-h-[520px] border-r border-[#ECECEE] last:border-r-0 p-2 flex flex-col gap-2">
+          <div
+            key={i}
+            onClick={() => onNewPost?.(weekDates[i] ? `${weekDates[i]}T09:00` : '')}
+            className={`min-h-[520px] border-r border-[#ECECEE] last:border-r-0 p-2 flex flex-col gap-2 cursor-pointer ${weekDates[i] === todayStr ? 'bg-[#F2F6FF]' : 'hover:bg-[#FBFBFC]/60'}`}
+          >
             {dayItems.map((it) => {
               const s = STATUS[it.status] ?? STATUS.draft
               const time = it.scheduled_at
@@ -55,7 +78,7 @@ export default function Calendar({ items }: { items: Item[] }) {
               return (
                 <button
                   key={it.id}
-                  onClick={() => setSelected(it)}
+                  onClick={(e) => { e.stopPropagation(); setSelected(it) }}
                   className="text-left border border-[#ECECEE] rounded-xl bg-white shadow-sm hover:shadow-md transition p-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#15171C]/15"
                 >
                   <div className="flex items-center justify-between mb-1.5">
