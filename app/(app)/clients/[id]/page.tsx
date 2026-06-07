@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import EditClientForm from './EditClientForm'
+import ChannelsSection, { type Channel } from './ChannelsSection'
 import ContactsSection, { type Contact } from './ContactsSection'
 import BrandAssetsSection, { type BrandAsset } from './BrandAssetsSection'
 import type { ClientDefaults, TeamOption } from '../ClientFormFields'
@@ -45,6 +46,12 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
     .select('id, full_name')
     .order('full_name')
 
+  const { data: channels } = await supabase
+    .from('channel')
+    .select('id, type, label')
+    .eq('client_id', id)
+    .order('type')
+
   const { data: contacts } = await supabase
     .from('client_contact')
     .select('id, first_name, surname, role, email, phone, is_primary')
@@ -82,6 +89,10 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
         <div className="text-sm text-[#5A5E66]">Edit client</div>
       </div>
       <EditClientForm clientId={client.id} defaults={defaults} teamMembers={(team as TeamOption[] | null) ?? []} />
+
+      <div className="max-w-[680px] mt-10">
+        <ChannelsSection clientId={client.id} channels={(channels as Channel[] | null) ?? []} />
+      </div>
 
       <div className="max-w-[680px] mt-10">
         <ContactsSection clientId={client.id} contacts={(contacts as Contact[] | null) ?? []} />
