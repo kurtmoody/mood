@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Calendar, { type Item } from '@/components/Calendar'
 import MonthCalendar from '@/components/MonthCalendar'
 import ClientSwitcher from '@/components/ClientSwitcher'
 import Drawer from '@/components/Drawer'
 import NewPostForm from './NewPostForm'
+import { transitionPostAction } from './approvalActions'
 import { addDays, addMonths, mondayOf, monthOf, monthGridDates, monthLabel, weekDates, weekRangeLabel } from '@/lib/week'
 
 type ClientOption = { id: string; name: string }
@@ -35,6 +36,11 @@ export default function CalendarBoard({
   const params = useSearchParams()
   const [selected, setSelected] = useState<Item | null>(null)
   const [formDate, setFormDate] = useState<string | null>(null)
+
+  // Keep the open drawer in sync after a transition refreshes the posts.
+  useEffect(() => {
+    setSelected((cur) => (cur ? posts.find((p) => p.id === cur.id) ?? null : cur))
+  }, [posts])
 
   function go(overrides: Record<string, string>) {
     const sp = new URLSearchParams(params.toString())
@@ -113,7 +119,7 @@ export default function CalendarBoard({
         />
       )}
 
-      <Drawer item={selected} onClose={() => setSelected(null)} />
+      <Drawer item={selected} onClose={() => setSelected(null)} transitionAction={transitionPostAction} />
 
       {formDate !== null && (
         <NewPostForm

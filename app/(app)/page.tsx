@@ -69,19 +69,34 @@ export default async function Home({
 
   const { data: items } = await supabase
     .from('content_item')
-    .select('id, title, content_type, scheduled_at, status, current_version_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no )')
+    .select('id, title, content_type, scheduled_at, status, current_version_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no ), events:approval_event ( id, action, note, created_at, actor_id )')
     .eq('client_id', selected.id)
     .gte('scheduled_at', weekStartUTC)
     .lt('scheduled_at', weekEndUTC)
     .order('scheduled_at')
 
-  // Body is versioned — resolve each item's current version (or the latest) server-side.
+  // Resolve approval-event actors to team-member names.
+  const { data: team } = await supabase.from('team_member').select('full_name, user_id')
+  const nameByUser = new Map<string, string>()
+  for (const t of team ?? []) if (t.user_id) nameByUser.set(t.user_id, t.full_name)
+
   const posts = (items ?? []).map((it: any) => {
+    // Body is versioned — resolve the current version (or the latest).
     const versions = it.versions ?? []
     const current =
       versions.find((v: any) => v.id === it.current_version_id) ??
       [...versions].sort((a: any, b: any) => b.version_no - a.version_no)[0]
-    return { ...it, body: current?.body ?? null }
+    // History oldest → newest, actor mapped to a name (or null).
+    const events = (it.events ?? [])
+      .map((e: any) => ({
+        id: e.id,
+        action: e.action,
+        note: e.note,
+        created_at: e.created_at,
+        actor: (e.actor_id && nameByUser.get(e.actor_id)) || null,
+      }))
+      .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
+    return { ...it, body: current?.body ?? null, events }
   })
 
   return (

@@ -1,6 +1,14 @@
 'use client'
 import { maltaDate } from '@/lib/week'
 
+export type ApprovalEvent = {
+  id: string
+  action: string
+  note: string | null
+  created_at: string
+  actor: string | null
+}
+
 export type Item = {
   id: string
   title: string | null
@@ -9,6 +17,7 @@ export type Item = {
   status: string
   body: string | null
   channel: { type: string; label: string | null } | null
+  events?: ApprovalEvent[]
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -19,6 +28,7 @@ export const STATUS: Record<string, { dot: string; label: string }> = {
   changes_requested: { dot: '#E0572E', label: 'Changes requested' },
   internal_review:   { dot: '#8B5CF6', label: 'Internal review' },
   draft:             { dot: '#A6ABB3', label: 'Draft' },
+  posted:            { dot: '#0D9488', label: 'Posted' },
 }
 
 export default function Calendar({
