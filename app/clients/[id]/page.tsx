@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import Nav from '@/components/Nav'
 import EditClientForm from './EditClientForm'
 import ContactsSection, { type Contact } from './ContactsSection'
+import BrandAssetsSection, { type BrandAsset } from './BrandAssetsSection'
 import type { ClientDefaults, TeamOption } from '../ClientFormFields'
 
 type Internal = {
@@ -52,6 +53,12 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
     .order('is_primary', { ascending: false })
     .order('first_name')
 
+  const { data: assets } = await supabase
+    .from('brand_asset')
+    .select('id, kind, label, value, notes')
+    .eq('client_id', id)
+    .order('kind')
+
   const defaults: ClientDefaults = {
     name: client.name,
     status: client.status,
@@ -80,6 +87,10 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
 
       <div className="max-w-[680px] mt-10">
         <ContactsSection clientId={client.id} contacts={(contacts as Contact[] | null) ?? []} />
+      </div>
+
+      <div className="max-w-[680px] mt-10">
+        <BrandAssetsSection clientId={client.id} assets={(assets as BrandAsset[] | null) ?? []} />
       </div>
     </main>
   )
