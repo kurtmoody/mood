@@ -1,6 +1,4 @@
 'use client'
-import { useState } from 'react'
-import Drawer from './Drawer'
 import { maltaDate } from '@/lib/week'
 
 export type Item = {
@@ -27,15 +25,15 @@ export default function Calendar({
   items,
   weekDates,
   todayStr,
+  onSelect,
   onNewPost,
 }: {
   items: Item[]
   weekDates: string[]
   todayStr?: string
+  onSelect: (item: Item) => void
   onNewPost?: (prefill: string) => void
 }) {
-  const [selected, setSelected] = useState<Item | null>(null)
-
   // Bucket posts by their actual Malta date; only this week's 7 dates render.
   const byDate = new Map<string, Item[]>()
   for (const it of items) {
@@ -78,7 +76,7 @@ export default function Calendar({
               return (
                 <button
                   key={it.id}
-                  onClick={(e) => { e.stopPropagation(); setSelected(it) }}
+                  onClick={(e) => { e.stopPropagation(); onSelect(it) }}
                   className="text-left border border-[#ECECEE] rounded-xl bg-white shadow-sm hover:shadow-md transition p-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#15171C]/15"
                 >
                   <div className="flex items-center justify-between mb-1.5">
@@ -98,8 +96,6 @@ export default function Calendar({
           </div>
         </div>
       </div>
-
-      <Drawer item={selected} onClose={() => setSelected(null)} />
     </div>
   )
 }

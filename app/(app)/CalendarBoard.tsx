@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Calendar from '@/components/Calendar'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Calendar, { type Item } from '@/components/Calendar'
+import MonthCalendar from '@/components/MonthCalendar'
 import ClientSwitcher from '@/components/ClientSwitcher'
+import Drawer from '@/components/Drawer'
 import NewPostForm from './NewPostForm'
-import { addDays, mondayOf, weekRangeLabel } from '@/lib/week'
+import { addDays, addMonths, mondayOf, monthOf, monthGridDates, monthLabel, weekDates, weekRangeLabel } from '@/lib/week'
 
 type ClientOption = { id: string; name: string }
 type Channel = { id: string; type: string; label: string | null }
@@ -15,38 +17,72 @@ export default function CalendarBoard({
   selectedClientId,
   channelsByClient,
   posts,
+  view,
   monday,
-  weekDates,
+  month,
   todayStr,
 }: {
   clients: ClientOption[]
   selectedClientId: string
   channelsByClient: Record<string, Channel[]>
-  posts: React.ComponentProps<typeof Calendar>['items']
+  posts: Item[]
+  view: 'week' | 'month'
   monday: string
-  weekDates: string[]
+  month: string
   todayStr: string
 }) {
   const router = useRouter()
-  // null = closed; '' or a datetime string = open (with optional prefill)
+  const params = useSearchParams()
+  const [selected, setSelected] = useState<Item | null>(null)
   const [formDate, setFormDate] = useState<string | null>(null)
 
-  function goWeek(targetMonday: string) {
-    router.push(`/?client=${selectedClientId}&week=${targetMonday}`)
+  function go(overrides: Record<string, string>) {
+    const sp = new URLSearchParams(params.toString())
+    sp.set('client', selectedClientId)
+    for (const [k, v] of Object.entries(overrides)) sp.set(k, v)
+    router.push(`/?${sp.toString()}`)
   }
+
+  function prev() {
+    if (view === 'week') go({ view: 'week', week: addDays(monday, -7) })
+    else go({ view: 'month', month: addMonths(month, -1) })
+  }
+  function next() {
+    if (view === 'week') go({ view: 'week', week: addDays(monday, 7) })
+    else go({ view: 'month', month: addMonths(month, 1) })
+  }
+  function today() {
+    if (view === 'week') go({ view: 'week', week: mondayOf(todayStr) })
+    else go({ view: 'month', month: monthOf(todayStr) })
+  }
+
+  const tab = (v: 'week' | 'month', label: string) => (
+    <button
+      onClick={() => (v === 'week' ? go({ view: 'week', week: monday }) : go({ view: 'month', month }))}
+      className={`px-3 py-2 ${view === v ? 'bg-[#15171C] text-white font-semibold' : 'text-[#5A5E66] hover:bg-[#F4F4F6]'}`}
+    >
+      {label}
+    </button>
+  )
 
   return (
     <>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <ClientSwitcher clients={clients} current={selectedClientId} />
-          <div className="text-sm text-[#5A5E66] mt-1.5">{weekRangeLabel(monday)}</div>
+          <div className="text-sm text-[#5A5E66] mt-1.5">
+            {view === 'week' ? weekRangeLabel(monday) : monthLabel(month)}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center rounded-lg border border-[#E2E2E5] overflow-hidden text-sm">
+            {tab('week', 'Week')}
+            {tab('month', 'Month')}
+          </div>
           <div className="flex items-center rounded-lg border border-[#E2E2E5] overflow-hidden text-sm text-[#5A5E66]">
-            <button onClick={() => goWeek(addDays(monday, -7))} aria-label="Previous week" className="px-2.5 py-2 hover:bg-[#F4F4F6]">‹</button>
-            <button onClick={() => goWeek(mondayOf(todayStr))} className="px-3 py-2 border-x border-[#E2E2E5] hover:bg-[#F4F4F6]">Today</button>
-            <button onClick={() => goWeek(addDays(monday, 7))} aria-label="Next week" className="px-2.5 py-2 hover:bg-[#F4F4F6]">›</button>
+            <button onClick={prev} aria-label="Previous" className="px-2.5 py-2 hover:bg-[#F4F4F6]">‹</button>
+            <button onClick={today} className="px-3 py-2 border-x border-[#E2E2E5] hover:bg-[#F4F4F6]">Today</button>
+            <button onClick={next} aria-label="Next" className="px-2.5 py-2 hover:bg-[#F4F4F6]">›</button>
           </div>
           <button
             onClick={() => setFormDate('')}
@@ -57,7 +93,27 @@ export default function CalendarBoard({
         </div>
       </div>
 
-      <Calendar items={posts} weekDates={weekDates} todayStr={todayStr} onNewPost={(d) => setFormDate(d)} />
+      {view === 'week' ? (
+        <Calendar
+          items={posts}
+          weekDates={weekDates(monday)}
+          todayStr={todayStr}
+          onSelect={setSelected}
+          onNewPost={(d) => setFormDate(d)}
+        />
+      ) : (
+        <MonthCalendar
+          items={posts}
+          gridDates={monthGridDates(month)}
+          month={month}
+          todayStr={todayStr}
+          onSelect={setSelected}
+          onNewPost={(d) => setFormDate(d)}
+          onShowWeek={(m) => go({ view: 'week', week: m })}
+        />
+      )}
+
+      <Drawer item={selected} onClose={() => setSelected(null)} />
 
       {formDate !== null && (
         <NewPostForm

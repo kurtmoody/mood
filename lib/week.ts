@@ -68,6 +68,49 @@ export function isDateStr(s: string | undefined | null): s is string {
   return !!s && /^\d{4}-\d{2}-\d{2}$/.test(s)
 }
 
+// ----- Month helpers -----
+
+// 'YYYY-MM' of a date.
+export function monthOf(dateStr: string): string {
+  return dateStr.slice(0, 7)
+}
+
+// First day of a month, 'YYYY-MM-DD'.
+export function firstOfMonth(month: string): string {
+  return `${month}-01`
+}
+
+// Shift a month by n, 'YYYY-MM'.
+export function addMonths(month: string, n: number): string {
+  const d = new Date(`${month}-01T12:00:00Z`)
+  d.setUTCMonth(d.getUTCMonth() + n)
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+// Validate a 'YYYY-MM' string.
+export function isMonthStr(s: string | undefined | null): s is string {
+  return !!s && /^\d{4}-\d{2}$/.test(s)
+}
+
+// "June 2026".
+export function monthLabel(month: string): string {
+  return new Date(`${month}-01T12:00:00Z`).toLocaleDateString('en-GB', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
+// Full month grid (Mon-aligned): Monday on/before the 1st → Sunday on/after the last day.
+export function monthGridDates(month: string): string[] {
+  const start = mondayOf(firstOfMonth(month))
+  const lastDay = addDays(firstOfMonth(addMonths(month, 1)), -1)
+  const end = addDays(mondayOf(lastDay), 6)
+  const out: string[] = []
+  for (let d = start; d <= end; d = addDays(d, 1)) out.push(d)
+  return out
+}
+
 // "9–15 June 2026", handling cross-month / cross-year weeks.
 export function weekRangeLabel(monday: string): string {
   const start = new Date(`${monday}T12:00:00Z`)

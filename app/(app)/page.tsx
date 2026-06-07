@@ -1,11 +1,24 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import CalendarBoard from './CalendarBoard'
-import { addDays, isDateStr, mondayOf, todayMalta, weekDates, zonedDayStartUTC } from '@/lib/week'
+import {
+  addDays,
+  isDateStr,
+  isMonthStr,
+  mondayOf,
+  monthGridDates,
+  monthOf,
+  todayMalta,
+  zonedDayStartUTC,
+} from '@/lib/week'
 
 type Channel = { id: string; type: string; label: string | null }
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ client?: string; week?: string }> }) {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ client?: string; week?: string; month?: string; view?: string }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -26,17 +39,24 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
     )
   }
 
-  const { client: requested, week: weekParam } = await searchParams
+  const { client: requested, week: weekParam, month: monthParam, view: viewParam } = await searchParams
 
   // Selected client from ?client=, falling back to the first one.
   const selected = clientList.find((c) => c.id === requested) ?? clientList[0]
 
-  // Viewed week from ?week= (snapped to its Monday), defaulting to the current Malta week.
+  const view: 'week' | 'month' = viewParam === 'month' ? 'month' : 'week'
   const todayStr = todayMalta()
+
+  // Both anchors are tracked independently so each view keeps its own position.
   const monday = mondayOf(isDateStr(weekParam) ? weekParam : todayStr)
-  const days = weekDates(monday)
-  const weekStartUTC = zonedDayStartUTC(monday).toISOString()
-  const weekEndUTC = zonedDayStartUTC(addDays(monday, 7)).toISOString()
+  const month = isMonthStr(monthParam) ? monthParam : monthOf(todayStr)
+
+  // Fetch the active view's full visible range (Malta-day boundaries → UTC).
+  const grid = view === 'week' ? null : monthGridDates(month)
+  const rangeStartDate = view === 'week' ? monday : grid![0]
+  const rangeEndDate = view === 'week' ? addDays(monday, 7) : addDays(grid![grid!.length - 1], 1)
+  const weekStartUTC = zonedDayStartUTC(rangeStartDate).toISOString()
+  const weekEndUTC = zonedDayStartUTC(rangeEndDate).toISOString()
 
   // All channels for the user's clients, grouped — powers the New post form's channel picker.
   const { data: allChannels } = await supabase
@@ -70,8 +90,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
       selectedClientId={selected.id}
       channelsByClient={channelsByClient}
       posts={posts}
+      view={view}
       monday={monday}
-      weekDates={days}
+      month={month}
       todayStr={todayStr}
     />
   )
