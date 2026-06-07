@@ -10,7 +10,7 @@ const CLIENT_STATUS: Record<string, { dot: string; label: string }> = {
   archived: { dot: '#A6ABB3', label: 'Archived' },
 }
 
-type Contact = { name: string; email: string | null }
+type Contact = { first_name: string | null; surname: string | null; email: string | null }
 type Client = {
   id: string
   name: string
@@ -35,7 +35,7 @@ export default async function ClientsPage() {
   // agency-only client_contact table, filtered to the single is_primary row.
   const { data: clients } = await supabase
     .from('client')
-    .select('id, name, status, industry, primary_contact:client_contact ( name, email )')
+    .select('id, name, status, industry, primary_contact:client_contact ( first_name, surname, email )')
     .eq('primary_contact.is_primary', true)
     .order('name')
 
@@ -89,7 +89,7 @@ export default async function ClientsPage() {
                 <div className="text-sm">
                   {contact ? (
                     <>
-                      <span>{contact.name}</span>
+                      <span>{[contact.first_name, contact.surname].filter(Boolean).join(' ') || '—'}</span>
                       {contact.email && <span className="text-[#9398A1]"> · {contact.email}</span>}
                     </>
                   ) : (

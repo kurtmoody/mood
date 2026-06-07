@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Nav from '@/components/Nav'
 import EditClientForm from './EditClientForm'
+import ContactsSection, { type Contact } from './ContactsSection'
 import type { ClientDefaults, TeamOption } from '../ClientFormFields'
 
 type Internal = {
@@ -44,6 +45,13 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
     .select('id, full_name')
     .order('full_name')
 
+  const { data: contacts } = await supabase
+    .from('client_contact')
+    .select('id, first_name, surname, role, email, phone, is_primary')
+    .eq('client_id', id)
+    .order('is_primary', { ascending: false })
+    .order('first_name')
+
   const defaults: ClientDefaults = {
     name: client.name,
     status: client.status,
@@ -69,6 +77,10 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
         <div className="text-sm text-[#5A5E66]">Edit client</div>
       </div>
       <EditClientForm clientId={client.id} defaults={defaults} teamMembers={(team as TeamOption[] | null) ?? []} />
+
+      <div className="max-w-[680px] mt-10">
+        <ContactsSection clientId={client.id} contacts={(contacts as Contact[] | null) ?? []} />
+      </div>
     </main>
   )
 }
