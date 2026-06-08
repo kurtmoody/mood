@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { STATUS, type Item } from './Calendar'
 import MediaSection from './MediaSection'
+import VersionHistory from './VersionHistory'
 
 type ActionState = { error: string | null; ok: boolean }
 type ActionFn = (prev: ActionState, fd: FormData) => Promise<ActionState>
@@ -376,6 +377,8 @@ export default function Drawer({
               </ol>
             </div>
           )}
+
+          {isAgency && <VersionHistory versions={item.versions ?? []} />}
 
           <div className="mt-7 pt-5 border-t border-[#ECECEE]">
             <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-3">Comments</div>

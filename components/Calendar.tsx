@@ -26,6 +26,17 @@ export type Comment = {
   author: string
 }
 
+export type VersionDetail = {
+  id: string
+  version_no: number
+  body: string | null
+  created_at: string
+  author: string | null
+  isCurrent: boolean
+  media: Media[]
+  events: { action: string; created_at: string }[]
+}
+
 export type Item = {
   id: string
   title: string | null
@@ -40,6 +51,7 @@ export type Item = {
   events?: ApprovalEvent[]
   comments?: Comment[]
   media?: Media[]
+  versions?: VersionDetail[]
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']

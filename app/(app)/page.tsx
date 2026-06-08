@@ -77,7 +77,7 @@ export default async function Home({
   // status filter is defence-in-depth and helps the query planner.
   let itemsQuery = supabase
     .from('content_item')
-    .select('id, title, content_type, scheduled_at, status, current_version_id, channel_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no, media ( id, storage_path, mime_type, created_at ) ), events:approval_event ( id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id )')
+    .select('id, title, content_type, scheduled_at, status, current_version_id, channel_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no, created_by, created_at, media ( id, storage_path, mime_type, created_at ) ), events:approval_event ( id, version_id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id )')
     .eq('client_id', selected.id)
     .gte('scheduled_at', weekStartUTC)
     .lt('scheduled_at', weekEndUTC)
@@ -114,21 +114,44 @@ export default async function Home({
         author: (c.author_id && nameByUser.get(c.author_id)) || 'Client',
       }))
       .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
-    // Media on the current version, in upload order. URLs are signed below.
-    const media = (current?.media ?? [])
-      .map((m: any) => ({ id: m.id, storage_path: m.storage_path, mime_type: m.mime_type, created_at: m.created_at, url: null as string | null }))
-      .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
-    return { ...it, body: current?.body ?? null, version_no: current?.version_no ?? 1, events, comments, media }
+    // Approval events grouped by version (for per-version status in the history viewer).
+    const eventsByVersion = new Map<string, any[]>()
+    for (const e of it.events ?? []) {
+      if (!e.version_id) continue
+      const arr = eventsByVersion.get(e.version_id)
+      if (arr) arr.push(e)
+      else eventsByVersion.set(e.version_id, [e])
+    }
+    // Full version history, newest first. Media url is filled by the batched signing below.
+    const versionList = [...versions]
+      .sort((a: any, b: any) => b.version_no - a.version_no)
+      .map((v: any) => ({
+        id: v.id,
+        version_no: v.version_no,
+        body: v.body ?? null,
+        created_at: v.created_at,
+        author: (v.created_by && nameByUser.get(v.created_by)) || null,
+        isCurrent: v.id === current?.id,
+        media: (v.media ?? [])
+          .map((m: any) => ({ id: m.id, storage_path: m.storage_path, mime_type: m.mime_type, created_at: m.created_at, url: null as string | null }))
+          .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0)),
+        events: (eventsByVersion.get(v.id) ?? [])
+          .map((e: any) => ({ action: e.action, created_at: e.created_at }))
+          .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0)),
+      }))
+    // The current version's media (same objects as in versionList, so signing fills both).
+    const media = versionList.find((v: any) => v.isCurrent)?.media ?? []
+    return { ...it, body: current?.body ?? null, version_no: current?.version_no ?? 1, events, comments, media, versions: versionList }
   })
 
-  // Sign all visible media in ONE batched call (1-hour TTL). The Storage SELECT
-  // policy gates this server-side; we only sign paths the RLS-filtered query returned.
-  const allPaths: string[] = posts.flatMap((p: any) => p.media.map((m: any) => m.storage_path))
+  // Sign ALL versions' media in ONE batched call (1-hour TTL) — not just the current
+  // version, so the version-history viewer's old thumbnails load. RLS-gated server-side.
+  const allPaths: string[] = posts.flatMap((p: any) => p.versions.flatMap((v: any) => v.media.map((m: any) => m.storage_path)))
   if (allPaths.length > 0) {
     const { data: signed } = await supabase.storage.from('content-media').createSignedUrls(allPaths, 3600)
     const urlByPath = new Map<string, string>()
     for (const s of signed ?? []) if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl)
-    for (const p of posts) for (const m of p.media) m.url = urlByPath.get(m.storage_path) ?? null
+    for (const p of posts) for (const v of p.versions) for (const m of v.media) m.url = urlByPath.get(m.storage_path) ?? null
   }
 
   return (
