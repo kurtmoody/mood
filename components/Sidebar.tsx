@@ -1,14 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Calendar, Users, Users2, Pin, type LucideIcon } from 'lucide-react'
+import { Calendar, LayoutDashboard, Users, Users2, Pin, type LucideIcon } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 type NavItem = { href: string; label: string; icon: LucideIcon; isActive: (path: string) => boolean; agencyOnly?: boolean }
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Calendar', icon: Calendar, isActive: (p) => p === '/' },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, isActive: (p) => p === '/dashboard', agencyOnly: true },
   { href: '/clients', label: 'Clients', icon: Users, isActive: (p) => p === '/clients' || p.startsWith('/clients/'), agencyOnly: true },
   { href: '/team', label: 'Team', icon: Users2, isActive: (p) => p === '/team' || p.startsWith('/team/'), agencyOnly: true },
 ]
@@ -30,6 +32,23 @@ export default function Sidebar({
   const navItems = NAV_ITEMS.filter((i) => isAgency || !i.agencyOnly)
   const [hovered, setHovered] = useState(false)
   const expanded = pinned || hovered // desktop: rail expands on hover when unpinned
+
+  // Glanceable "needs your action" count for the Dashboard badge. RLS scopes this to
+  // the agency's clients; refetched on navigation so acting on a post updates it.
+  const [actionCount, setActionCount] = useState(0)
+  useEffect(() => {
+    if (!isAgency) return
+    let cancelled = false
+    const supabase = createClient()
+    ;(async () => {
+      const { count } = await supabase
+        .from('content_item')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['internal_review', 'changes_requested'])
+      if (!cancelled) setActionCount(count ?? 0)
+    })()
+    return () => { cancelled = true }
+  }, [isAgency, pathname])
 
   return (
     <>
@@ -61,6 +80,7 @@ export default function Sidebar({
         <nav className="flex-1 p-3 flex flex-col gap-1">
           {navItems.map(({ href, label, icon: Icon, isActive }) => {
             const active = isActive(pathname)
+            const badge = href === '/dashboard' ? actionCount : 0
             return (
               <Link
                 key={href}
@@ -71,7 +91,14 @@ export default function Sidebar({
                   active ? 'bg-[#15171C] text-white font-semibold' : 'text-[#5A5E66] hover:bg-[#F4F4F6]'
                 }`}
               >
-                <Icon size={18} className="shrink-0" />
+                <span className="relative shrink-0">
+                  <Icon size={18} />
+                  {badge > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] px-1 rounded-full bg-[#E0572E] text-white text-[9px] font-semibold grid place-items-center">
+                      {badge > 9 ? '9+' : badge}
+                    </span>
+                  )}
+                </span>
                 <span className="whitespace-nowrap">{label}</span>
               </Link>
             )
