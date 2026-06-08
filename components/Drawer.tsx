@@ -43,6 +43,12 @@ const ACTIONS: Record<string, { action: string; label: string }[]> = {
   posted: [],
 }
 
+// Client-facing labels for the two actions a client may take (agency labels unchanged).
+const CLIENT_ACTION_LABELS: Record<string, string> = {
+  approve: 'Approve',
+  request_changes: 'Request changes',
+}
+
 // Past-tense labels for the history log.
 const ACTION_PAST: Record<string, string> = {
   submit_internal: 'Submitted for internal review',
@@ -222,6 +228,15 @@ export default function Drawer({
   const s = STATUS[item.status] ?? STATUS.draft
   const channel = item.channel?.label ?? item.channel?.type ?? item.content_type
   const actions = ACTIONS[item.status] ?? []
+  // Agency: all valid transitions for the status. Client: only approve /
+  // request_changes, and only on a client_review post — never any agency transition.
+  const visibleActions = isAgency
+    ? actions
+    : item.status === 'client_review'
+      ? actions
+          .filter((a) => a.action === 'approve' || a.action === 'request_changes')
+          .map((a) => ({ action: a.action, label: CLIENT_ACTION_LABELS[a.action] ?? a.label }))
+      : []
   const events = item.events ?? []
   const comments = item.comments ?? []
   const canEdit = isAgency && EDITABLE.has(item.status)
@@ -291,18 +306,18 @@ export default function Drawer({
             versionId={item.current_version_id}
           />
 
-          {isAgency && actions.length > 0 && (
+          {visibleActions.length > 0 && (
             <form ref={formRef} action={action} className="mt-7 pt-5 border-t border-[#ECECEE]">
               <input type="hidden" name="item_id" value={item.id} />
-              <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2">Move forward</div>
+              <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2">{isAgency ? 'Move forward' : 'Your review'}</div>
               <textarea
                 name="note"
                 rows={2}
-                placeholder="Add a note (required when requesting changes)"
+                placeholder={isAgency ? 'Add a note (required when requesting changes)' : 'Add a note (required if requesting changes)'}
                 className="w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white mb-3"
               />
               <div className="flex flex-wrap gap-2">
-                {actions.map(({ action: a, label }) => {
+                {visibleActions.map(({ action: a, label }) => {
                   const danger = a === 'request_changes'
                   return (
                     <button
