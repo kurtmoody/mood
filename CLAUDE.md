@@ -72,3 +72,18 @@ Later: image upload (Supabase Storage) for brand assets / posts; auto-chase emai
 - Keep the existing clean/minimal style (white canvas, hairline grid, small status dots).
 - Show a plan/diff before large changes; prefer small, reviewable steps.
 - Commit after each working feature with a clear message.
+
+## Future: @mentions & notifications
+Recorded requirement — NOT built yet. Build the notification spine alongside/after the client portal.
+
+- **@mentions**: mention both internal people (`team_member`) and external people (`client_contact` / client portal users) on comments (and later other objects), so they get notified and can act.
+- **Pervasive notifications**: status/approval transitions, new comments, @mentions, "awaiting your approval", changes requested, etc.
+- **Per-user preferences (Monday.com-style)**: each notification type × channel toggled on/off by the user (default on).
+- **Channels**: in-app inbox (bell) + email via Resend.
+  - Dependency: external email delivery needs a **verified Mood domain in Resend**; `onboarding@resend.dev` only delivers to the project owner today.
+- **Architecture intent** (so current choices don't block it):
+  - Emit notifications from the existing SECURITY DEFINER RPC write paths (`transition_post`, `add_comment`, future RPCs) — a single choke point, not scattered triggers.
+  - Store mentions as **structured rows** (mentioned person ids), not by parsing comment text later.
+  - Planned tables: `notification` (recipient, type, subject ref, read_at, created_at) and `notification_preference` (user, type, channel, enabled).
+  - Recipients keyed to auth `user_id` where possible; external contacts notified by email until they have a portal login.
+- **Sequencing**: internal mentions can follow comments; external mentions/notifications become meaningful once the client portal exists.
