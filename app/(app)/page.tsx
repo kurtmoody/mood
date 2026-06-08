@@ -118,7 +118,7 @@ export default async function Home({
     const media = (current?.media ?? [])
       .map((m: any) => ({ id: m.id, storage_path: m.storage_path, mime_type: m.mime_type, created_at: m.created_at, url: null as string | null }))
       .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
-    return { ...it, body: current?.body ?? null, events, comments, media }
+    return { ...it, body: current?.body ?? null, version_no: current?.version_no ?? 1, events, comments, media }
   })
 
   // Sign all visible media in ONE batched call (1-hour TTL). The Storage SELECT

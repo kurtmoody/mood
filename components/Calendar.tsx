@@ -35,6 +35,7 @@ export type Item = {
   body: string | null
   channel_id: string | null
   current_version_id: string | null
+  version_no?: number
   channel: { type: string; label: string | null } | null
   events?: ApprovalEvent[]
   comments?: Comment[]

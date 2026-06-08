@@ -43,7 +43,7 @@ export async function updatePostAction(_prev: PostState, fd: FormData): Promise<
   const itemId = str(fd, 'item_id')
   if (!itemId) return { error: 'Missing post.', ok: false }
 
-  const { error } = await supabase.rpc('update_post', {
+  const { data, error } = await supabase.rpc('update_post', {
     p_item_id: itemId,
     p_title: str(fd, 'title'),
     p_channel_id: str(fd, 'channel_id'),
@@ -51,6 +51,18 @@ export async function updatePostAction(_prev: PostState, fd: FormData): Promise<
     p_body: str(fd, 'body'),
   })
   if (error) return { error: error.message, ok: false }
+
+  // (a) Fork media copies: a frozen-status edit forks v2 and returns the
+  // {old_path,new_path} pairs for its media; copy each storage object to the new
+  // version's path BEFORE the refresh so v2's files exist when the calendar re-renders.
+  // In-place edits return [] → no-op. A copy failure is logged and skipped — v1's
+  // files are untouched and the app shows a placeholder for a missing object, so a
+  // partial copy is recoverable, not corrupting.
+  const pairs = (data as { old_path: string; new_path: string }[] | null) ?? []
+  for (const { old_path, new_path } of pairs) {
+    const { error: copyErr } = await supabase.storage.from('content-media').copy(old_path, new_path)
+    if (copyErr) console.error(`update_post: media copy failed ${old_path} → ${new_path}: ${copyErr.message}`)
+  }
 
   revalidatePath('/')
   return { error: null, ok: true }

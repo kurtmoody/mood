@@ -11,6 +11,10 @@ type Channel = { id: string; type: string; label: string | null }
 // A post is editable by agency only before it reaches the client.
 const EDITABLE = new Set(['draft', 'internal_review', 'changes_requested'])
 
+// Shown before editing a frozen (client-facing) post — editing forks a new version.
+const FORK_WARNING =
+  'This post has been sent to the client. Editing it will create a new version and return it to internal review for re-approval. Continue?'
+
 // Convert an ISO instant to a datetime-local value ('YYYY-MM-DDTHH:mm') in local time.
 function toLocalInput(iso: string) {
   const d = new Date(iso)
@@ -132,11 +136,13 @@ function EditPostForm({
   channels,
   action,
   onCancel,
+  isFork,
 }: {
   item: Item
   channels: Channel[]
   action: ActionFn
   onCancel: () => void
+  isFork: boolean
 }) {
   const [state, formAction, pending] = useActionState(action, initial)
   const [when, setWhen] = useState(() => (item.scheduled_at ? toLocalInput(item.scheduled_at) : ''))
@@ -148,6 +154,11 @@ function EditPostForm({
     <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="item_id" value={item.id} />
       <input type="hidden" name="scheduled_at" value={iso} />
+      {isFork && (
+        <div className="text-[13px] text-[#9C5A00] bg-[#E8920C]/10 border border-[#E8920C]/25 rounded-lg px-3 py-2">
+          Saving creates a new version and returns this post to internal review for re-approval.
+        </div>
+      )}
       <div>
         <label className={labelCls}>Title</label>
         <input name="title" defaultValue={item.title ?? ''} className={fieldCls} />
@@ -239,8 +250,8 @@ export default function Drawer({
       : []
   const events = item.events ?? []
   const comments = item.comments ?? []
-  const canEdit = isAgency && EDITABLE.has(item.status)
-  const locked = isAgency && !EDITABLE.has(item.status)
+  const editableInPlace = isAgency && EDITABLE.has(item.status)   // mutable: edit in place
+  const editableAsFork = isAgency && !EDITABLE.has(item.status)   // frozen: edit forks a new version
 
   return (
     <div className="fixed inset-0 z-50">
@@ -252,12 +263,20 @@ export default function Drawer({
             <h2 className="text-lg font-bold leading-snug">{item.title ?? 'Untitled'}</h2>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {canEdit && !editing && (
+            {!editing && editableInPlace && (
               <button
                 onClick={() => setEditing(true)}
                 className="px-2.5 h-8 grid place-items-center rounded-lg text-sm text-[#5A5E66] hover:bg-[#F4F4F6] cursor-pointer"
               >
                 Edit
+              </button>
+            )}
+            {!editing && editableAsFork && (
+              <button
+                onClick={() => { if (window.confirm(FORK_WARNING)) setEditing(true) }}
+                className="px-2.5 h-8 grid place-items-center rounded-lg text-sm text-[#5A5E66] hover:bg-[#F4F4F6] cursor-pointer"
+              >
+                Edit (new version)
               </button>
             )}
             <button
@@ -272,7 +291,7 @@ export default function Drawer({
 
         <div className="px-6 py-5 overflow-y-auto flex-1">
           {editing ? (
-            <EditPostForm item={item} channels={channels} action={updatePostAction} onCancel={() => setEditing(false)} />
+            <EditPostForm item={item} channels={channels} action={updatePostAction} onCancel={() => setEditing(false)} isFork={editableAsFork} />
           ) : (
           <>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -285,6 +304,7 @@ export default function Drawer({
               <div className="flex items-center gap-1.5 text-sm">
                 <span className="w-2 h-2 rounded-full" style={{ background: s.dot }} />
                 {s.label}
+                {item.version_no ? <span className="text-[#9398A1]">· v{item.version_no}</span> : null}
               </div>
             </div>
           </div>
@@ -293,10 +313,6 @@ export default function Drawer({
           {item.body
             ? <div className="text-sm leading-relaxed whitespace-pre-wrap text-[#15171C]">{item.body}</div>
             : <div className="text-sm text-[#9398A1] italic">No content yet.</div>}
-
-          {locked && (
-            <div className="mt-4 text-[13px] text-[#9398A1]">Locked for editing — the client is involved.</div>
-          )}
 
           <MediaSection
             media={item.media ?? []}
