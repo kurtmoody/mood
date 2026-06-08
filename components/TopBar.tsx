@@ -1,6 +1,7 @@
 'use client'
 
 import { Menu } from 'lucide-react'
+import NotificationBell from './NotificationBell'
 import UserMenu from './UserMenu'
 
 export default function TopBar({ onBurger, email }: { onBurger: () => void; email: string }) {
@@ -14,7 +15,10 @@ export default function TopBar({ onBurger, email }: { onBurger: () => void; emai
         <Menu size={20} />
       </button>
       <div className="flex-1" />
-      <UserMenu email={email} />
+      <div className="flex items-center gap-1">
+        <NotificationBell />
+        <UserMenu email={email} />
+      </div>
     </header>
   )
 }

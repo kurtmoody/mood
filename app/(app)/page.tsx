@@ -21,7 +21,7 @@ const CLIENT_VISIBLE_STATUSES = ['client_review', 'changes_requested', 'approved
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ client?: string; week?: string; month?: string; view?: string }>
+  searchParams: Promise<{ client?: string; week?: string; month?: string; view?: string; post?: string }>
 }) {
   const supabase = await createClient()
   const access = await getAccess(supabase)
@@ -45,7 +45,7 @@ export default async function Home({
     )
   }
 
-  const { client: requested, week: weekParam, month: monthParam, view: viewParam } = await searchParams
+  const { client: requested, week: weekParam, month: monthParam, view: viewParam, post: postParam } = await searchParams
 
   // Selected client from ?client=, falling back to the first one.
   const selected = clientList.find((c) => c.id === requested) ?? clientList[0]
@@ -143,6 +143,7 @@ export default async function Home({
       todayStr={todayStr}
       currentUserId={access.userId}
       isAgency={isAgency}
+      openPostId={postParam ?? null}
     />
   )
 }

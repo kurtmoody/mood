@@ -26,6 +26,7 @@ export default function CalendarBoard({
   todayStr,
   currentUserId,
   isAgency,
+  openPostId,
 }: {
   clients: ClientOption[]
   selectedClientId: string
@@ -37,6 +38,7 @@ export default function CalendarBoard({
   todayStr: string
   currentUserId: string
   isAgency: boolean
+  openPostId: string | null
 }) {
   const router = useRouter()
   const params = useSearchParams()
@@ -47,6 +49,18 @@ export default function CalendarBoard({
   useEffect(() => {
     setSelected((cur) => (cur ? posts.find((p) => p.id === cur.id) ?? null : cur))
   }, [posts])
+
+  // Deep-link from a notification (?post=): open that post's drawer if it's in the
+  // RLS-filtered posts, then strip ?post (keeping client/week) so it doesn't linger.
+  useEffect(() => {
+    if (!openPostId) return
+    const target = posts.find((p) => p.id === openPostId)
+    if (target) setSelected(target)
+    const sp = new URLSearchParams(params.toString())
+    sp.delete('post')
+    router.replace(`/?${sp.toString()}`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openPostId])
 
   function go(overrides: Record<string, string>) {
     const sp = new URLSearchParams(params.toString())
