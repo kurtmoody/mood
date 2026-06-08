@@ -54,7 +54,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
 
   const { data: contacts } = await supabase
     .from('client_contact')
-    .select('id, first_name, surname, role, email, phone, is_primary')
+    .select('id, first_name, surname, role, email, phone, is_primary, portal_access')
     .eq('client_id', id)
     .order('is_primary', { ascending: false })
     .order('first_name')

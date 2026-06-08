@@ -5,6 +5,7 @@ import {
   addContactAction,
   updateContactAction,
   deleteContactAction,
+  setPortalAccessAction,
   type ContactState,
 } from './contactActions'
 
@@ -16,6 +17,7 @@ export type Contact = {
   email: string | null
   phone: string | null
   is_primary: boolean
+  portal_access: boolean
 }
 
 const initial: ContactState = { error: null, ok: false }
@@ -124,6 +126,31 @@ function DeleteContactButton({ contactId, clientId }: { contactId: string; clien
   )
 }
 
+function PortalAccessButton({ contact, clientId }: { contact: Contact; clientId: string }) {
+  const [state, action, pending] = useActionState(setPortalAccessAction, initial)
+
+  // Portal login matches the contact's email — can't invite without one.
+  if (!contact.email && !contact.portal_access) {
+    return <span className="text-sm text-[#9398A1]" title="Add an email before inviting">Email required</span>
+  }
+
+  return (
+    <form action={action}>
+      <input type="hidden" name="client_id" value={clientId} />
+      <input type="hidden" name="contact_id" value={contact.id} />
+      <input type="hidden" name="enabled" value={contact.portal_access ? 'false' : 'true'} />
+      <button
+        type="submit"
+        disabled={pending}
+        className={`text-sm hover:underline disabled:opacity-50 ${contact.portal_access ? 'text-[#5A5E66]' : 'text-[#15171C] font-medium'}`}
+      >
+        {pending ? '…' : contact.portal_access ? 'Revoke access' : 'Invite to portal'}
+      </button>
+      {state.error && <span className="text-xs text-red-600 ml-2">{state.error}</span>}
+    </form>
+  )
+}
+
 function ContactRow({ contact, clientId }: { contact: Contact; clientId: string }) {
   const [editing, setEditing] = useState(false)
   if (editing) return <EditContactForm contact={contact} clientId={clientId} onDone={() => setEditing(false)} />
@@ -136,12 +163,16 @@ function ContactRow({ contact, clientId }: { contact: Contact; clientId: string 
           {contact.is_primary && (
             <span className="text-[11px] text-[#16A34A] border border-[#16A34A]/30 rounded-full px-2 py-0.5">Primary</span>
           )}
+          {contact.portal_access && (
+            <span className="text-[11px] text-[#3B82F6] border border-[#3B82F6]/30 rounded-full px-2 py-0.5">Invited</span>
+          )}
         </div>
         <div className="text-xs text-[#5A5E66] mt-0.5 truncate">
           {[contact.role, contact.email, contact.phone].filter(Boolean).join(' · ') || '—'}
         </div>
       </div>
       <div className="flex items-center gap-3 shrink-0">
+        <PortalAccessButton contact={contact} clientId={clientId} />
         <button onClick={() => setEditing(true)} className="text-sm text-[#5A5E66] hover:underline">Edit</button>
         <DeleteContactButton contactId={contact.id} clientId={clientId} />
       </div>

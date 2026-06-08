@@ -18,6 +18,23 @@ async function authedClient() {
   return supabase
 }
 
+export async function setPortalAccessAction(_prev: ContactState, fd: FormData): Promise<ContactState> {
+  const supabase = await authedClient()
+  const clientId = str(fd, 'client_id')
+  const contactId = str(fd, 'contact_id')
+  if (!contactId) return { error: 'Missing contact id.', ok: false }
+  const enabled = fd.get('enabled') === 'true'
+
+  const { error } = await supabase.rpc('set_contact_portal_access', {
+    p_contact_id: contactId,
+    p_enabled: enabled,
+  })
+  if (error) return { error: error.message, ok: false }
+
+  if (clientId) revalidatePath(`/clients/${clientId}`)
+  return { error: null, ok: true }
+}
+
 export async function addContactAction(_prev: ContactState, fd: FormData): Promise<ContactState> {
   const supabase = await authedClient()
   const clientId = str(fd, 'client_id')
