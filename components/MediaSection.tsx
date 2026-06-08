@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { GripVertical } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { mediaKind, mediaName } from '@/lib/media'
 import type { Media } from './Calendar'
@@ -38,13 +39,13 @@ function MediaItem({ m, isAgency, onRemove }: { m: Media; isAgency: boolean; onR
       )}
       {kind === 'image' && (m.url
         // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={m.url} alt="" loading="lazy" className="w-full rounded-lg border border-[#ECECEE]" />
+        ? <img src={m.url} alt="" loading="lazy" draggable={false} className="w-full rounded-lg border border-[#ECECEE]" />
         : <Placeholder />)}
       {kind === 'video' && (m.url
-        ? <video src={m.url} controls className="w-full rounded-lg border border-[#ECECEE] bg-black" />
+        ? <video src={m.url} controls draggable={false} className="w-full rounded-lg border border-[#ECECEE] bg-black" />
         : <Placeholder />)}
       {kind === 'pdf' && (m.url
-        ? <a href={m.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm border border-[#ECECEE] rounded-lg px-3 py-2.5 hover:bg-[#F4F4F6]">📄 <span className="truncate">{mediaName(m.storage_path)}</span></a>
+        ? <a href={m.url} target="_blank" rel="noreferrer" draggable={false} className="flex items-center gap-2 text-sm border border-[#ECECEE] rounded-lg px-3 py-2.5 hover:bg-[#F4F4F6]">📄 <span className="truncate">{mediaName(m.storage_path)}</span></a>
         : <Placeholder />)}
       {kind === 'other' && <Placeholder />}
     </div>
@@ -70,6 +71,37 @@ export default function MediaSection({
   const [staged, setStaged] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Local order for optimistic drag-reorder (agency only). Re-syncs whenever the
+  // server order changes (after router.refresh()).
+  const [items, setItems] = useState<Media[]>(media)
+  const [overIndex, setOverIndex] = useState<number | null>(null)
+  const dragIndex = useRef<number | null>(null)
+  const orderKey = media.map((m) => m.id).join(',')
+  useEffect(() => { setItems(media) }, [orderKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function onDrop(to: number) {
+    const from = dragIndex.current
+    dragIndex.current = null
+    setOverIndex(null)
+    if (from === null || from === to) return
+    const next = [...items]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    setItems(next) // optimistic
+    void persistOrder(next)
+  }
+
+  async function persistOrder(next: Media[]) {
+    if (!versionId) return
+    setError(null)
+    const { error: rErr } = await supabase.rpc('reorder_media', {
+      p_version_id: versionId,
+      p_ordered_ids: next.map((m) => m.id),
+    })
+    if (rErr) setError(rErr.message)
+    router.refresh() // re-sync from the server (reverts the optimistic move on failure)
+  }
 
   function addFiles(list: FileList | null) {
     if (!list) return
@@ -125,11 +157,32 @@ export default function MediaSection({
     <div className="mt-7 pt-5 border-t border-[#ECECEE]">
       <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-3">Media</div>
 
-      {media.length === 0 ? (
+      {items.length === 0 ? (
         <div className="text-sm text-[#9398A1]">No media yet.</div>
       ) : (
         <div className="flex flex-col gap-3">
-          {media.map((m) => <MediaItem key={m.id} m={m} isAgency={isAgency} onRemove={removeMedia} />)}
+          {isAgency && items.length > 1 && (
+            <p className="text-xs text-[#9398A1] -mt-1">Drag to reorder.</p>
+          )}
+          {items.map((m, i) => (
+            <div
+              key={m.id}
+              draggable={isAgency}
+              onDragStart={isAgency ? () => { dragIndex.current = i } : undefined}
+              onDragOver={isAgency ? (e) => { e.preventDefault(); setOverIndex(i) } : undefined}
+              onDragLeave={isAgency ? () => setOverIndex((cur) => (cur === i ? null : cur)) : undefined}
+              onDrop={isAgency ? () => onDrop(i) : undefined}
+              onDragEnd={isAgency ? () => { dragIndex.current = null; setOverIndex(null) } : undefined}
+              className={`relative rounded-lg ${isAgency ? 'cursor-move' : ''} ${overIndex === i ? 'ring-2 ring-[#15171C]/30' : ''}`}
+            >
+              {isAgency && (
+                <span className="absolute top-2 left-2 z-10 grid place-items-center w-6 h-6 rounded-full bg-black/50 text-white" aria-hidden>
+                  <GripVertical size={14} />
+                </span>
+              )}
+              <MediaItem m={m} isAgency={isAgency} onRemove={removeMedia} />
+            </div>
+          ))}
         </div>
       )}
 
