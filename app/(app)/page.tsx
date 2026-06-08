@@ -77,7 +77,7 @@ export default async function Home({
   // status filter is defence-in-depth and helps the query planner.
   let itemsQuery = supabase
     .from('content_item')
-    .select('id, title, content_type, scheduled_at, status, current_version_id, channel_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no, created_by, created_at, media ( id, storage_path, mime_type, created_at ) ), events:approval_event ( id, version_id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id )')
+    .select('id, title, content_type, scheduled_at, status, current_version_id, channel_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no, created_by, created_at, media ( id, storage_path, mime_type, created_at, sort_order ) ), events:approval_event ( id, version_id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id )')
     .eq('client_id', selected.id)
     .gte('scheduled_at', weekStartUTC)
     .lt('scheduled_at', weekEndUTC)
@@ -133,8 +133,9 @@ export default async function Home({
         author: (v.created_by && nameByUser.get(v.created_by)) || null,
         isCurrent: v.id === current?.id,
         media: (v.media ?? [])
-          .map((m: any) => ({ id: m.id, storage_path: m.storage_path, mime_type: m.mime_type, created_at: m.created_at, url: null as string | null }))
-          .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0)),
+          .slice()
+          .sort((a: any, b: any) => (a.sort_order - b.sort_order) || (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
+          .map((m: any) => ({ id: m.id, storage_path: m.storage_path, mime_type: m.mime_type, created_at: m.created_at, url: null as string | null })),
         events: (eventsByVersion.get(v.id) ?? [])
           .map((e: any) => ({ action: e.action, created_at: e.created_at }))
           .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0)),
