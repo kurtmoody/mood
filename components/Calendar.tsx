@@ -1,5 +1,14 @@
 'use client'
 import { maltaDate } from '@/lib/week'
+import MediaThumb from './MediaThumb'
+
+export type Media = {
+  id: string
+  storage_path: string
+  mime_type: string | null
+  created_at: string
+  url: string | null
+}
 
 export type ApprovalEvent = {
   id: string
@@ -25,9 +34,11 @@ export type Item = {
   status: string
   body: string | null
   channel_id: string | null
+  current_version_id: string | null
   channel: { type: string; label: string | null } | null
   events?: ApprovalEvent[]
   comments?: Comment[]
+  media?: Media[]
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -99,6 +110,7 @@ export default function Calendar({
                   onClick={(e) => { e.stopPropagation(); onSelect(it) }}
                   className="text-left border border-[#ECECEE] rounded-xl bg-white shadow-sm hover:shadow-md transition p-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#15171C]/15"
                 >
+                  {it.media && it.media.length > 0 && <MediaThumb media={it.media} />}
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[12px] font-semibold capitalize">{it.channel?.type ?? it.content_type}</span>
                     <span className="text-[11px] text-[#9398A1]">{time}</span>

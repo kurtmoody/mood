@@ -135,6 +135,7 @@ export default function CalendarBoard({
         addCommentAction={addCommentAction}
         deleteCommentAction={deleteCommentAction}
         channels={channelsByClient[selectedClientId] ?? []}
+        clientId={selectedClientId}
         currentUserId={currentUserId}
         isAgency={isAgency}
       />

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { STATUS, type Item } from './Calendar'
+import MediaSection from './MediaSection'
 
 type ActionState = { error: string | null; ok: boolean }
 type ActionFn = (prev: ActionState, fd: FormData) => Promise<ActionState>
@@ -185,6 +186,7 @@ export default function Drawer({
   addCommentAction,
   deleteCommentAction,
   channels,
+  clientId,
   currentUserId,
   isAgency,
 }: {
@@ -195,6 +197,7 @@ export default function Drawer({
   addCommentAction: ActionFn
   deleteCommentAction: ActionFn
   channels: Channel[]
+  clientId: string
   currentUserId: string
   isAgency: boolean
 }) {
@@ -279,6 +282,14 @@ export default function Drawer({
           {locked && (
             <div className="mt-4 text-[13px] text-[#9398A1]">Locked for editing — the client is involved.</div>
           )}
+
+          <MediaSection
+            media={item.media ?? []}
+            isAgency={isAgency}
+            clientId={clientId}
+            contentItemId={item.id}
+            versionId={item.current_version_id}
+          />
 
           {isAgency && actions.length > 0 && (
             <form ref={formRef} action={action} className="mt-7 pt-5 border-t border-[#ECECEE]">

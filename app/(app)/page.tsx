@@ -77,7 +77,7 @@ export default async function Home({
   // status filter is defence-in-depth and helps the query planner.
   let itemsQuery = supabase
     .from('content_item')
-    .select('id, title, content_type, scheduled_at, status, current_version_id, channel_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no ), events:approval_event ( id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id )')
+    .select('id, title, content_type, scheduled_at, status, current_version_id, channel_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no, media ( id, storage_path, mime_type, created_at ) ), events:approval_event ( id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id )')
     .eq('client_id', selected.id)
     .gte('scheduled_at', weekStartUTC)
     .lt('scheduled_at', weekEndUTC)
@@ -114,8 +114,22 @@ export default async function Home({
         author: (c.author_id && nameByUser.get(c.author_id)) || 'Client',
       }))
       .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
-    return { ...it, body: current?.body ?? null, events, comments }
+    // Media on the current version, in upload order. URLs are signed below.
+    const media = (current?.media ?? [])
+      .map((m: any) => ({ id: m.id, storage_path: m.storage_path, mime_type: m.mime_type, created_at: m.created_at, url: null as string | null }))
+      .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
+    return { ...it, body: current?.body ?? null, events, comments, media }
   })
+
+  // Sign all visible media in ONE batched call (1-hour TTL). The Storage SELECT
+  // policy gates this server-side; we only sign paths the RLS-filtered query returned.
+  const allPaths: string[] = posts.flatMap((p: any) => p.media.map((m: any) => m.storage_path))
+  if (allPaths.length > 0) {
+    const { data: signed } = await supabase.storage.from('content-media').createSignedUrls(allPaths, 3600)
+    const urlByPath = new Map<string, string>()
+    for (const s of signed ?? []) if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl)
+    for (const p of posts) for (const m of p.media) m.url = urlByPath.get(m.storage_path) ?? null
+  }
 
   return (
     <CalendarBoard
