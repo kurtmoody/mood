@@ -12,6 +12,19 @@ export default function Callback() {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     const query = new URLSearchParams(window.location.search)
 
+    // Idempotent: grants client_approver membership for any portal-enabled contact
+    // whose email matches this user. Safe for agency users (0 grants). We await it
+    // so membership exists before the app loads, but never block login on a failure.
+    async function claimThenHome() {
+      try {
+        const { error } = await supabase.rpc('claim_client_access')
+        if (error) console.error('claim_client_access failed:', error.message)
+      } catch (e) {
+        console.error('claim_client_access threw:', e)
+      }
+      router.replace('/')
+    }
+
     async function run() {
       if (hash.get('error') || query.get('error')) {
         router.replace('/login?error=expired')
@@ -23,13 +36,13 @@ export default function Callback() {
 
       if (access_token && refresh_token) {
         const { error } = await supabase.auth.setSession({ access_token, refresh_token })
-        if (!error) return router.replace('/')
+        if (!error) return claimThenHome()
       } else if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (!error) return router.replace('/')
+        if (!error) return claimThenHome()
       }
       const { data } = await supabase.auth.getSession()
-      if (data.session) return router.replace('/')
+      if (data.session) return claimThenHome()
       router.replace('/login?error=auth')
     }
     run()

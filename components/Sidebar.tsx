@@ -5,12 +5,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Calendar, Users, Users2, Pin, type LucideIcon } from 'lucide-react'
 
-type NavItem = { href: string; label: string; icon: LucideIcon; isActive: (path: string) => boolean }
+type NavItem = { href: string; label: string; icon: LucideIcon; isActive: (path: string) => boolean; agencyOnly?: boolean }
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Calendar', icon: Calendar, isActive: (p) => p === '/' },
-  { href: '/clients', label: 'Clients', icon: Users, isActive: (p) => p === '/clients' || p.startsWith('/clients/') },
-  { href: '/team', label: 'Team', icon: Users2, isActive: (p) => p === '/team' || p.startsWith('/team/') },
+  { href: '/clients', label: 'Clients', icon: Users, isActive: (p) => p === '/clients' || p.startsWith('/clients/'), agencyOnly: true },
+  { href: '/team', label: 'Team', icon: Users2, isActive: (p) => p === '/team' || p.startsWith('/team/'), agencyOnly: true },
 ]
 
 export default function Sidebar({
@@ -18,13 +18,16 @@ export default function Sidebar({
   onClose,
   pinned,
   onTogglePin,
+  isAgency,
 }: {
   open: boolean
   onClose: () => void
   pinned: boolean
   onTogglePin: () => void
+  isAgency: boolean
 }) {
   const pathname = usePathname()
+  const navItems = NAV_ITEMS.filter((i) => isAgency || !i.agencyOnly)
   const [hovered, setHovered] = useState(false)
   const expanded = pinned || hovered // desktop: rail expands on hover when unpinned
 
@@ -56,7 +59,7 @@ export default function Sidebar({
         </div>
 
         <nav className="flex-1 p-3 flex flex-col gap-1">
-          {NAV_ITEMS.map(({ href, label, icon: Icon, isActive }) => {
+          {navItems.map(({ href, label, icon: Icon, isActive }) => {
             const active = isActive(pathname)
             return (
               <Link

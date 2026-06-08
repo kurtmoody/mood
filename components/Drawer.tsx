@@ -280,7 +280,7 @@ export default function Drawer({
             <div className="mt-4 text-[13px] text-[#9398A1]">Locked for editing — the client is involved.</div>
           )}
 
-          {actions.length > 0 && (
+          {isAgency && actions.length > 0 && (
             <form ref={formRef} action={action} className="mt-7 pt-5 border-t border-[#ECECEE]">
               <input type="hidden" name="item_id" value={item.id} />
               <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2">Move forward</div>

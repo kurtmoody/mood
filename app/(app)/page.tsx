@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getAccess } from '@/lib/access'
 import CalendarBoard from './CalendarBoard'
 import {
   addDays,
@@ -14,20 +15,25 @@ import {
 
 type Channel = { id: string; type: string; label: string | null }
 
+// Statuses a client user is allowed to see (mirrors the RLS read floor, 0015).
+const CLIENT_VISIBLE_STATUSES = ['client_review', 'changes_requested', 'approved', 'scheduled', 'posted']
+
 export default async function Home({
   searchParams,
 }: {
   searchParams: Promise<{ client?: string; week?: string; month?: string; view?: string }>
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const access = await getAccess(supabase)
+  if (!access) redirect('/login')
+  const isAgency = access.type === 'agency'
+  const isClient = access.type === 'client'
 
-  // Clients the user can see (RLS scopes to their agency's clients).
-  const { data: clients } = await supabase
-    .from('client')
-    .select('id, name')
-    .order('name')
+  // Clients the user can see (RLS scopes this already); for client users restrict
+  // explicitly to their own client(s) — defence-in-depth, no agency-wide picker.
+  let clientsQuery = supabase.from('client').select('id, name').order('name')
+  if (isClient) clientsQuery = clientsQuery.in('id', access.clientIds)
+  const { data: clients } = await clientsQuery
   const clientList = clients ?? []
 
   if (clientList.length === 0) {
@@ -67,13 +73,16 @@ export default async function Home({
     ;(channelsByClient[ch.client_id] ??= []).push({ id: ch.id, type: ch.type, label: ch.label })
   }
 
-  const { data: items } = await supabase
+  // RLS already restricts client users to client_review+ posts; the explicit
+  // status filter is defence-in-depth and helps the query planner.
+  let itemsQuery = supabase
     .from('content_item')
     .select('id, title, content_type, scheduled_at, status, current_version_id, channel_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no ), events:approval_event ( id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id )')
     .eq('client_id', selected.id)
     .gte('scheduled_at', weekStartUTC)
     .lt('scheduled_at', weekEndUTC)
-    .order('scheduled_at')
+  if (isClient) itemsQuery = itemsQuery.in('status', CLIENT_VISIBLE_STATUSES)
+  const { data: items } = await itemsQuery.order('scheduled_at')
 
   // Resolve approval-event actors to team-member names.
   const { data: team } = await supabase.from('team_member').select('full_name, user_id')
@@ -108,14 +117,6 @@ export default async function Home({
     return { ...it, body: current?.body ?? null, events, comments }
   })
 
-  // Current user + whether they're agency staff (for comment-delete visibility).
-  const { data: agencyMem } = await supabase
-    .from('membership')
-    .select('scope_id')
-    .eq('scope_type', 'agency')
-    .limit(1)
-  const isAgency = !!agencyMem?.length
-
   return (
     <CalendarBoard
       clients={clientList}
@@ -126,7 +127,7 @@ export default async function Home({
       monday={monday}
       month={month}
       todayStr={todayStr}
-      currentUserId={user.id}
+      currentUserId={access.userId}
       isAgency={isAgency}
     />
   )

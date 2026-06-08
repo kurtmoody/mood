@@ -96,12 +96,14 @@ export default function CalendarBoard({
             <button onClick={today} className="px-3 py-2 border-x border-[#E2E2E5] hover:bg-[#F4F4F6]">Today</button>
             <button onClick={next} aria-label="Next" className="px-2.5 py-2 hover:bg-[#F4F4F6]">›</button>
           </div>
-          <button
-            onClick={() => setFormDate('')}
-            className="shrink-0 bg-[#15171C] text-white rounded-lg px-3.5 py-2 text-sm font-semibold"
-          >
-            New post
-          </button>
+          {isAgency && (
+            <button
+              onClick={() => setFormDate('')}
+              className="shrink-0 bg-[#15171C] text-white rounded-lg px-3.5 py-2 text-sm font-semibold"
+            >
+              New post
+            </button>
+          )}
         </div>
       </div>
 
