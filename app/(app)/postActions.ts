@@ -34,3 +34,24 @@ export async function createPostAction(_prev: PostState, fd: FormData): Promise<
   revalidatePath('/')
   return { error: null, ok: true }
 }
+
+export async function updatePostAction(_prev: PostState, fd: FormData): Promise<PostState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const itemId = str(fd, 'item_id')
+  if (!itemId) return { error: 'Missing post.', ok: false }
+
+  const { error } = await supabase.rpc('update_post', {
+    p_item_id: itemId,
+    p_title: str(fd, 'title'),
+    p_channel_id: str(fd, 'channel_id'),
+    p_scheduled_at: str(fd, 'scheduled_at'), // ISO string, converted client-side
+    p_body: str(fd, 'body'),
+  })
+  if (error) return { error: error.message, ok: false }
+
+  revalidatePath('/')
+  return { error: null, ok: true }
+}

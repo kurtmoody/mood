@@ -5,6 +5,25 @@ import { STATUS, type Item } from './Calendar'
 
 type ActionState = { error: string | null; ok: boolean }
 type ActionFn = (prev: ActionState, fd: FormData) => Promise<ActionState>
+type Channel = { id: string; type: string; label: string | null }
+
+// A post is editable by agency only before it reaches the client.
+const EDITABLE = new Set(['draft', 'internal_review', 'changes_requested'])
+
+// Convert an ISO instant to a datetime-local value ('YYYY-MM-DDTHH:mm') in local time.
+function toLocalInput(iso: string) {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function channelLabel(c: Channel) {
+  return c.label ? `${c.label} (${cap(c.type)})` : cap(c.type)
+}
+
+function cap(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
 
 // Actions available from each status (key → button label).
 const ACTIONS: Record<string, { action: string; label: string }[]> = {
@@ -98,24 +117,89 @@ function CommentDeleteButton({ commentId, action }: { commentId: string; action:
   )
 }
 
+const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
+const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white'
+
+function EditPostForm({
+  item,
+  channels,
+  action,
+  onCancel,
+}: {
+  item: Item
+  channels: Channel[]
+  action: ActionFn
+  onCancel: () => void
+}) {
+  const [state, formAction, pending] = useActionState(action, initial)
+  const [when, setWhen] = useState(() => (item.scheduled_at ? toLocalInput(item.scheduled_at) : ''))
+  useEffect(() => { if (state.ok) onCancel() }, [state.ok]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const iso = when ? new Date(when).toISOString() : ''
+
+  return (
+    <form action={formAction} className="flex flex-col gap-4">
+      <input type="hidden" name="item_id" value={item.id} />
+      <input type="hidden" name="scheduled_at" value={iso} />
+      <div>
+        <label className={labelCls}>Title</label>
+        <input name="title" defaultValue={item.title ?? ''} className={fieldCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Channel</label>
+        <select name="channel_id" defaultValue={item.channel_id ?? ''} className={fieldCls}>
+          <option value="">No channel</option>
+          {channels.map((c) => <option key={c.id} value={c.id}>{channelLabel(c)}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className={labelCls}>Scheduled date &amp; time</label>
+        <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className={fieldCls} />
+      </div>
+      <div>
+        <label className={labelCls}>Caption</label>
+        <textarea name="body" rows={6} defaultValue={item.body ?? ''} className={fieldCls} />
+      </div>
+      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={pending}
+          className="bg-[#15171C] text-white rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+        >
+          {pending ? 'Saving…' : 'Save changes'}
+        </button>
+        <button type="button" onClick={onCancel} className="text-sm text-[#5A5E66] rounded-lg px-3 py-2.5 hover:bg-[#F4F4F6]">
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
 export default function Drawer({
   item,
   onClose,
   transitionAction,
+  updatePostAction,
   addCommentAction,
   deleteCommentAction,
+  channels,
   currentUserId,
   isAgency,
 }: {
   item: Item | null
   onClose: () => void
   transitionAction: ActionFn
+  updatePostAction: ActionFn
   addCommentAction: ActionFn
   deleteCommentAction: ActionFn
+  channels: Channel[]
   currentUserId: string
   isAgency: boolean
 }) {
   const [state, action, pending] = useActionState(transitionAction, initial)
+  const [editing, setEditing] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -127,6 +211,9 @@ export default function Drawer({
 
   useEffect(() => { if (state.ok) formRef.current?.reset() }, [state.ok])
 
+  // Reset edit mode when a different post is opened (or the drawer closes).
+  useEffect(() => { setEditing(false) }, [item?.id])
+
   if (!item) return null
 
   const s = STATUS[item.status] ?? STATUS.draft
@@ -134,6 +221,8 @@ export default function Drawer({
   const actions = ACTIONS[item.status] ?? []
   const events = item.events ?? []
   const comments = item.comments ?? []
+  const canEdit = isAgency && EDITABLE.has(item.status)
+  const locked = isAgency && !EDITABLE.has(item.status)
 
   return (
     <div className="fixed inset-0 z-50">
@@ -144,16 +233,30 @@ export default function Drawer({
             <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold capitalize mb-1">{channel}</div>
             <h2 className="text-lg font-bold leading-snug">{item.title ?? 'Untitled'}</h2>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="shrink-0 w-8 h-8 grid place-items-center rounded-lg text-[#9398A1] hover:bg-[#F4F4F6] cursor-pointer"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {canEdit && !editing && (
+              <button
+                onClick={() => setEditing(true)}
+                className="px-2.5 h-8 grid place-items-center rounded-lg text-sm text-[#5A5E66] hover:bg-[#F4F4F6] cursor-pointer"
+              >
+                Edit
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="w-8 h-8 grid place-items-center rounded-lg text-[#9398A1] hover:bg-[#F4F4F6] cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="px-6 py-5 overflow-y-auto flex-1">
+          {editing ? (
+            <EditPostForm item={item} channels={channels} action={updatePostAction} onCancel={() => setEditing(false)} />
+          ) : (
+          <>
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
               <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Scheduled</div>
@@ -172,6 +275,10 @@ export default function Drawer({
           {item.body
             ? <div className="text-sm leading-relaxed whitespace-pre-wrap text-[#15171C]">{item.body}</div>
             : <div className="text-sm text-[#9398A1] italic">No content yet.</div>}
+
+          {locked && (
+            <div className="mt-4 text-[13px] text-[#9398A1]">Locked for editing — the client is involved.</div>
+          )}
 
           {actions.length > 0 && (
             <form ref={formRef} action={action} className="mt-7 pt-5 border-t border-[#ECECEE]">
@@ -250,6 +357,8 @@ export default function Drawer({
             )}
             <AddCommentForm itemId={item.id} action={addCommentAction} />
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

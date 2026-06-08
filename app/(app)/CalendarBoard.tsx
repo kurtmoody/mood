@@ -9,6 +9,7 @@ import Drawer from '@/components/Drawer'
 import NewPostForm from './NewPostForm'
 import { transitionPostAction } from './approvalActions'
 import { addCommentAction, deleteCommentAction } from './commentActions'
+import { updatePostAction } from './postActions'
 import { addDays, addMonths, mondayOf, monthOf, monthGridDates, monthLabel, weekDates, weekRangeLabel } from '@/lib/week'
 
 type ClientOption = { id: string; name: string }
@@ -128,8 +129,10 @@ export default function CalendarBoard({
         item={selected}
         onClose={() => setSelected(null)}
         transitionAction={transitionPostAction}
+        updatePostAction={updatePostAction}
         addCommentAction={addCommentAction}
         deleteCommentAction={deleteCommentAction}
+        channels={channelsByClient[selectedClientId] ?? []}
         currentUserId={currentUserId}
         isAgency={isAgency}
       />

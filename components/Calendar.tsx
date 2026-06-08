@@ -24,6 +24,7 @@ export type Item = {
   scheduled_at: string | null
   status: string
   body: string | null
+  channel_id: string | null
   channel: { type: string; label: string | null } | null
   events?: ApprovalEvent[]
   comments?: Comment[]

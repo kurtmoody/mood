@@ -69,7 +69,7 @@ export default async function Home({
 
   const { data: items } = await supabase
     .from('content_item')
-    .select('id, title, content_type, scheduled_at, status, current_version_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no ), events:approval_event ( id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id )')
+    .select('id, title, content_type, scheduled_at, status, current_version_id, channel_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no ), events:approval_event ( id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id )')
     .eq('client_id', selected.id)
     .gte('scheduled_at', weekStartUTC)
     .lt('scheduled_at', weekEndUTC)
