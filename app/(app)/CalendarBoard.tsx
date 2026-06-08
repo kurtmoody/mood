@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Calendar, { type Item } from '@/components/Calendar'
+import Calendar, { STATUS, type Item } from '@/components/Calendar'
 import MonthCalendar from '@/components/MonthCalendar'
 import ClientSwitcher from '@/components/ClientSwitcher'
+import FilterMenu from '@/components/FilterMenu'
 import Drawer from '@/components/Drawer'
 import NewPostForm from './NewPostForm'
 import { transitionPostAction } from './approvalActions'
@@ -45,6 +46,12 @@ export default function CalendarBoard({
   const [selected, setSelected] = useState<Item | null>(null)
   const [formDate, setFormDate] = useState<string | null>(null)
 
+  // Client-side filters over the already-loaded (RLS-scoped) posts — no refetch, no
+  // query/URL change. State resets on navigation/refresh (not persisted), which is fine.
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set())
+  const [channelFilter, setChannelFilter] = useState<Set<string>>(new Set())
+  const [needsReview, setNeedsReview] = useState(false)
+
   // Keep the open drawer in sync after a transition refreshes the posts.
   useEffect(() => {
     setSelected((cur) => (cur ? posts.find((p) => p.id === cur.id) ?? null : cur))
@@ -61,6 +68,55 @@ export default function CalendarBoard({
     router.replace(`/?${sp.toString()}`)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openPostId])
+
+  // Status options are role-gated: clients only ever see client-visible statuses, so
+  // "draft"/"internal_review" are never even offered to them.
+  const statusOptions = (
+    isAgency
+      ? ['draft', 'internal_review', 'changes_requested', 'client_review', 'approved', 'scheduled', 'posted']
+      : ['client_review', 'changes_requested', 'approved', 'scheduled', 'posted']
+  ).map((s) => ({ value: s, label: STATUS[s]?.label ?? s }))
+
+  // Channel options come from the channels actually present in the loaded posts.
+  const channelOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const p of posts) {
+      const key = p.channel_id ?? '__none__'
+      if (!map.has(key)) {
+        const t = p.channel?.type
+        map.set(key, p.channel?.label ?? (t ? t.charAt(0).toUpperCase() + t.slice(1) : 'No channel'))
+      }
+    }
+    return [...map].map(([value, label]) => ({ value, label }))
+  }, [posts])
+
+  // The visible set: "Needs my review" (role-aware) takes precedence over the status
+  // picker; channel filter ANDs in. Empty selections mean "all".
+  const filtered = useMemo(() => {
+    const review = isAgency ? ['internal_review', 'changes_requested'] : ['client_review']
+    return posts.filter((p) => {
+      if (needsReview) {
+        if (!review.includes(p.status)) return false
+      } else if (statusFilter.size > 0 && !statusFilter.has(p.status)) {
+        return false
+      }
+      if (channelFilter.size > 0 && !channelFilter.has(p.channel_id ?? '__none__')) return false
+      return true
+    })
+  }, [posts, needsReview, statusFilter, channelFilter, isAgency])
+
+  const anyFilter = needsReview || statusFilter.size > 0 || channelFilter.size > 0
+  const toggleIn = (set: Set<string>, v: string) => {
+    const n = new Set(set)
+    if (n.has(v)) n.delete(v)
+    else n.add(v)
+    return n
+  }
+  function clearFilters() {
+    setNeedsReview(false)
+    setStatusFilter(new Set())
+    setChannelFilter(new Set())
+  }
 
   function go(overrides: Record<string, string>) {
     const sp = new URLSearchParams(params.toString())
@@ -121,9 +177,42 @@ export default function CalendarBoard({
         </div>
       </div>
 
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <FilterMenu
+          label="Status"
+          options={statusOptions}
+          selected={statusFilter}
+          onToggle={(v) => { setNeedsReview(false); setStatusFilter((s) => toggleIn(s, v)) }}
+          onClear={() => setStatusFilter(new Set())}
+        />
+        {channelOptions.length > 1 && (
+          <FilterMenu
+            label="Channel"
+            options={channelOptions}
+            selected={channelFilter}
+            onToggle={(v) => setChannelFilter((s) => toggleIn(s, v))}
+            onClear={() => setChannelFilter(new Set())}
+          />
+        )}
+        <button
+          onClick={() => { setNeedsReview((v) => !v); setStatusFilter(new Set()) }}
+          className={`rounded-lg border px-3 py-2 text-sm cursor-pointer ${
+            needsReview ? 'bg-[#15171C] text-white border-[#15171C] font-medium' : 'border-[#E2E2E5] text-[#5A5E66] hover:bg-[#F4F4F6]'
+          }`}
+        >
+          Needs my review
+        </button>
+        {anyFilter && (
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-xs text-[#9398A1]">Showing {filtered.length} of {posts.length}</span>
+            <button onClick={clearFilters} className="text-xs text-[#5A5E66] hover:underline cursor-pointer">Clear filters</button>
+          </div>
+        )}
+      </div>
+
       {view === 'week' ? (
         <Calendar
-          items={posts}
+          items={filtered}
           weekDates={weekDates(monday)}
           todayStr={todayStr}
           onSelect={setSelected}
@@ -131,7 +220,7 @@ export default function CalendarBoard({
         />
       ) : (
         <MonthCalendar
-          items={posts}
+          items={filtered}
           gridDates={monthGridDates(month)}
           month={month}
           todayStr={todayStr}
