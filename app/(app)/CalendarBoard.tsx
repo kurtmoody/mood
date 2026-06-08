@@ -8,6 +8,7 @@ import ClientSwitcher from '@/components/ClientSwitcher'
 import Drawer from '@/components/Drawer'
 import NewPostForm from './NewPostForm'
 import { transitionPostAction } from './approvalActions'
+import { addCommentAction, deleteCommentAction } from './commentActions'
 import { addDays, addMonths, mondayOf, monthOf, monthGridDates, monthLabel, weekDates, weekRangeLabel } from '@/lib/week'
 
 type ClientOption = { id: string; name: string }
@@ -22,6 +23,8 @@ export default function CalendarBoard({
   monday,
   month,
   todayStr,
+  currentUserId,
+  isAgency,
 }: {
   clients: ClientOption[]
   selectedClientId: string
@@ -31,6 +34,8 @@ export default function CalendarBoard({
   monday: string
   month: string
   todayStr: string
+  currentUserId: string
+  isAgency: boolean
 }) {
   const router = useRouter()
   const params = useSearchParams()
@@ -119,7 +124,15 @@ export default function CalendarBoard({
         />
       )}
 
-      <Drawer item={selected} onClose={() => setSelected(null)} transitionAction={transitionPostAction} />
+      <Drawer
+        item={selected}
+        onClose={() => setSelected(null)}
+        transitionAction={transitionPostAction}
+        addCommentAction={addCommentAction}
+        deleteCommentAction={deleteCommentAction}
+        currentUserId={currentUserId}
+        isAgency={isAgency}
+      />
 
       {formDate !== null && (
         <NewPostForm

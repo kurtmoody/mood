@@ -1,10 +1,10 @@
 'use client'
 
-import { useActionState, useEffect, useRef } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { STATUS, type Item } from './Calendar'
 
-type TransitionState = { error: string | null; ok: boolean }
-type TransitionAction = (prev: TransitionState, fd: FormData) => Promise<TransitionState>
+type ActionState = { error: string | null; ok: boolean }
+type ActionFn = (prev: ActionState, fd: FormData) => Promise<ActionState>
 
 // Actions available from each status (key → button label).
 const ACTIONS: Record<string, { action: string; label: string }[]> = {
@@ -49,16 +49,71 @@ function formatShort(iso: string) {
   return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-const initial: TransitionState = { error: null, ok: false }
+const initial: ActionState = { error: null, ok: false }
+
+function AddCommentForm({ itemId, action }: { itemId: string; action: ActionFn }) {
+  const [state, formAction, pending] = useActionState(action, initial)
+  const [body, setBody] = useState('')
+  useEffect(() => { if (state.ok) setBody('') }, [state.ok])
+
+  return (
+    <form action={formAction} className="mt-4">
+      <input type="hidden" name="item_id" value={itemId} />
+      <textarea
+        name="body"
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        rows={2}
+        placeholder="Add a comment"
+        className="w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white"
+      />
+      {state.error && <p className="text-sm text-red-600 mt-2">{state.error}</p>}
+      <div className="mt-2">
+        <button
+          type="submit"
+          disabled={pending || !body.trim()}
+          className="bg-[#15171C] text-white rounded-lg px-3.5 py-2 text-sm font-semibold disabled:opacity-50"
+        >
+          {pending ? 'Posting…' : 'Comment'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function CommentDeleteButton({ commentId, action }: { commentId: string; action: ActionFn }) {
+  const [state, formAction, pending] = useActionState(action, initial)
+  return (
+    <form
+      action={formAction}
+      onSubmit={(e) => { if (!confirm('Delete this comment?')) e.preventDefault() }}
+      className="mt-1"
+    >
+      <input type="hidden" name="comment_id" value={commentId} />
+      <button type="submit" disabled={pending} className="text-[12px] text-[#E0572E] hover:underline disabled:opacity-50">
+        Delete
+      </button>
+      {state.error && <span className="text-xs text-red-600 ml-2">{state.error}</span>}
+    </form>
+  )
+}
 
 export default function Drawer({
   item,
   onClose,
   transitionAction,
+  addCommentAction,
+  deleteCommentAction,
+  currentUserId,
+  isAgency,
 }: {
   item: Item | null
   onClose: () => void
-  transitionAction: TransitionAction
+  transitionAction: ActionFn
+  addCommentAction: ActionFn
+  deleteCommentAction: ActionFn
+  currentUserId: string
+  isAgency: boolean
 }) {
   const [state, action, pending] = useActionState(transitionAction, initial)
   const formRef = useRef<HTMLFormElement>(null)
@@ -78,6 +133,7 @@ export default function Drawer({
   const channel = item.channel?.label ?? item.channel?.type ?? item.content_type
   const actions = ACTIONS[item.status] ?? []
   const events = item.events ?? []
+  const comments = item.comments ?? []
 
   return (
     <div className="fixed inset-0 z-50">
@@ -171,6 +227,29 @@ export default function Drawer({
               </ol>
             </div>
           )}
+
+          <div className="mt-7 pt-5 border-t border-[#ECECEE]">
+            <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-3">Comments</div>
+            {comments.length === 0 ? (
+              <div className="text-sm text-[#9398A1]">No comments yet.</div>
+            ) : (
+              <ul className="flex flex-col gap-4">
+                {comments.map((c) => (
+                  <li key={c.id} className="text-sm">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-medium">{c.author}</span>
+                      <span className="shrink-0 text-[11px] text-[#9398A1]">{formatShort(c.created_at)}</span>
+                    </div>
+                    <div className="text-[#15171C] whitespace-pre-wrap mt-0.5">{c.body}</div>
+                    {(isAgency || c.author_id === currentUserId) && (
+                      <CommentDeleteButton commentId={c.id} action={deleteCommentAction} />
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <AddCommentForm itemId={item.id} action={addCommentAction} />
+          </div>
         </div>
       </div>
     </div>

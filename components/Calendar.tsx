@@ -9,6 +9,14 @@ export type ApprovalEvent = {
   actor: string | null
 }
 
+export type Comment = {
+  id: string
+  body: string
+  created_at: string
+  author_id: string | null
+  author: string
+}
+
 export type Item = {
   id: string
   title: string | null
@@ -18,6 +26,7 @@ export type Item = {
   body: string | null
   channel: { type: string; label: string | null } | null
   events?: ApprovalEvent[]
+  comments?: Comment[]
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']

@@ -69,7 +69,7 @@ export default async function Home({
 
   const { data: items } = await supabase
     .from('content_item')
-    .select('id, title, content_type, scheduled_at, status, current_version_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no ), events:approval_event ( id, action, note, created_at, actor_id )')
+    .select('id, title, content_type, scheduled_at, status, current_version_id, channel:channel_id ( type, label ), versions:content_version ( id, body, version_no ), events:approval_event ( id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id )')
     .eq('client_id', selected.id)
     .gte('scheduled_at', weekStartUTC)
     .lt('scheduled_at', weekEndUTC)
@@ -96,8 +96,25 @@ export default async function Home({
         actor: (e.actor_id && nameByUser.get(e.actor_id)) || null,
       }))
       .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
-    return { ...it, body: current?.body ?? null, events }
+    const comments = (it.comments ?? [])
+      .map((c: any) => ({
+        id: c.id,
+        body: c.body,
+        created_at: c.created_at,
+        author_id: c.author_id,
+        author: (c.author_id && nameByUser.get(c.author_id)) || 'Client',
+      }))
+      .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
+    return { ...it, body: current?.body ?? null, events, comments }
   })
+
+  // Current user + whether they're agency staff (for comment-delete visibility).
+  const { data: agencyMem } = await supabase
+    .from('membership')
+    .select('scope_id')
+    .eq('scope_type', 'agency')
+    .limit(1)
+  const isAgency = !!agencyMem?.length
 
   return (
     <CalendarBoard
@@ -109,6 +126,8 @@ export default async function Home({
       monday={monday}
       month={month}
       todayStr={todayStr}
+      currentUserId={user.id}
+      isAgency={isAgency}
     />
   )
 }
