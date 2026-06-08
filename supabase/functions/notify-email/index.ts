@@ -27,14 +27,6 @@ type NotificationRecord = {
   created_at: string
 }
 
-// Short subject per notification type.
-const SUBJECTS: Record<string, string> = {
-  ready_for_review: 'A post is ready for your review',
-  approved: 'A post was approved',
-  changes_requested: 'Changes requested',
-  comment: 'New comment',
-}
-
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -90,9 +82,12 @@ Deno.serve(async (req) => {
       return json({ skipped: 'no resend key' })
     }
 
-    const subject = SUBJECTS[record.type] ?? 'Mood update'
+    // Subject + body both come from record.body (the enriched bell copy), so the email
+    // matches the bell exactly. Subject is the body, trimmed to a sensible length.
+    const bodyText = record.body?.trim() ?? ''
+    const subject = bodyText ? (bodyText.length > 120 ? bodyText.slice(0, 119) + '…' : bodyText) : 'Mood update'
     const link = record.content_item_id ? `${APP_URL}/?post=${record.content_item_id}` : APP_URL
-    const message = record.body ? escapeHtml(record.body) : subject
+    const message = bodyText ? escapeHtml(bodyText) : subject
 
     const html = `
       <div style="font-family: Arial, Helvetica, sans-serif; color: #15171C; line-height: 1.5;">
