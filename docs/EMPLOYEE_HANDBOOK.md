@@ -292,7 +292,7 @@ Mood notifies the right people at the moments that matter (it's deliberately qui
 
 **Where notifications show up:**
 - **The bell** (top bar, in-app): an unread count and a dropdown of recent items; click one to jump straight to the post. You can mark items read.
-- **Email** (via our email service): the same message, by email. *Note:* email delivery is the one piece still being finalised — the in-app bell works today; email goes live once the email integration is switched on.
+- **Email** (via our email service, Resend): **live**. When a bell notification fires, the recipient also gets an email with the same message and an "Open in Mood" button that links straight to the post.
 
 ---
 
@@ -385,7 +385,7 @@ Yes. Filters and the chosen view are saved in the page address, so you can copy 
 **Notifications**
 
 **Q: A client didn't get an email notification.**
-The in-app **bell** works now; **email delivery is still being switched on**. Until then, don't rely on email reaching the client — the bell and a nudge are your friends. (Ask the dev team for the current status.)
+Email delivery is **live** (via Resend). A few reasons one might not arrive: the recipient's account has no email on file; it landed in spam; or **the action was yours** — Mood skips emailing the person who did the thing (you won't be emailed about your own change). The in-app bell is the source of truth — if the bell shows it but no email arrived, tell the dev team (they can check the Resend send logs).
 
 **Q: I'm getting too few/too many notifications.**
 Mood is deliberately quiet — it only notifies on meaningful events (sent to client, approved, changes requested, comments). Per-person notification preferences are a planned future feature.

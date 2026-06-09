@@ -558,7 +558,7 @@ Then ensure a **Database Webhook** exists on `public.notification` (event INSERT
 
 ### Outstanding operational tasks (as of 2026-06-09)
 - Migrations through **0032** are applied (ownership, task↔content link, admin RACI editing are live).
-- Deploy `notify-email` + wire the Database Webhook for email to actually send (still pending — the bell works; email does not until this is done).
+- Email delivery is **live**: `notify-email` deployed + Database Webhook `notify_email_on_insert` on `notification` INSERT, sending via Resend (`mail.mood.mt`). Runbook: `supabase/functions/notify-email/DEPLOY.md`.
 
 ### Environment
 - App: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (`.env.local` + Vercel).
