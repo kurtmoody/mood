@@ -6,7 +6,7 @@
 
 -- ---------- 0. Reset (clears previous attempts so this can be re-run) ----------
 drop table if exists
-  public.approval_event, public.comment, public.asset, public.content_version,
+  public.approval_event, public.comment, public.content_version,
   public.content_item, public.channel, public.membership, public.client, public.agency cascade;
 drop type if exists content_status;
 drop type if exists member_role;
@@ -79,19 +79,6 @@ create table public.content_version (
   created_at      timestamptz default now()
 );
 
-create table public.asset (
-  id                 uuid primary key default gen_random_uuid(),
-  content_version_id uuid not null references public.content_version(id) on delete cascade,
-  source             text not null default 'upload',  -- 'upload' | 'gdrive'
-  file_url           text,
-  drive_file_id      text,
-  drive_web_url      text,
-  thumbnail_url      text,
-  media_type         text,
-  filename           text,
-  size_bytes         bigint
-);
-
 create table public.comment (
   id              uuid primary key default gen_random_uuid(),
   content_item_id uuid not null references public.content_item(id) on delete cascade,
@@ -162,7 +149,6 @@ alter table public.membership      enable row level security;
 alter table public.channel         enable row level security;
 alter table public.content_item    enable row level security;
 alter table public.content_version enable row level security;
-alter table public.asset           enable row level security;
 alter table public.comment         enable row level security;
 alter table public.approval_event  enable row level security;
 
@@ -193,14 +179,10 @@ create policy ci_write on public.content_item
   using      (public.is_agency_for_client(client_id))
   with check (public.is_agency_for_client(client_id));
 
--- Versions / assets / events / comments: read if you can see the parent item
+-- Versions / events / comments: read if you can see the parent item
 create policy cv_read on public.content_version
   for select using (content_item_id in
     (select id from public.content_item where client_id in (select public.client_ids_for_user())));
-create policy asset_read on public.asset
-  for select using (content_version_id in
-    (select id from public.content_version where content_item_id in
-      (select id from public.content_item where client_id in (select public.client_ids_for_user()))));
 create policy ae_read on public.approval_event
   for select using (content_item_id in
     (select id from public.content_item where client_id in (select public.client_ids_for_user())));
