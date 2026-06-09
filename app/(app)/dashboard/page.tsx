@@ -82,17 +82,29 @@ export default async function DashboardPage() {
   // Tasks (internal): RLS scopes to the agency. Open = not Complete. Don't swallow errors.
   const { data: taskData, error: taskErr } = await supabase
     .from('task')
-    .select('id, title, status, priority, due_date, owner:owner_id ( full_name )')
+    .select('id, title, status, priority, due_date, owner_id, client_id, owner:owner_id ( full_name ), client:client_id ( name )')
   if (taskErr) console.error('dashboard tasks query failed:', taskErr.message, taskErr.code)
   const todayISO = new Date().toISOString().slice(0, 10)
   const openTasks = (taskData ?? []).filter((t: any) => t.status !== 'Complete')
+  const overdueCount = openTasks.filter((t: any) => t.due_date && t.due_date < todayISO).length
   const taskStatusCounts = OPEN_STATUSES
     .map((s) => ({ status: s as string, count: openTasks.filter((t: any) => t.status === s).length }))
     .filter((c) => c.count > 0)
-  const urgentTasks = openTasks
-    .filter((t: any) => (t.due_date && t.due_date < todayISO) || t.priority === 'Urgent')
-    .sort((a: any, b: any) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999'))
-    .slice(0, 5)
+
+  const ownerMap = new Map<string, { id: string | null; name: string; count: number }>()
+  for (const t of openTasks as any[]) {
+    const k = t.owner_id ?? 'none'
+    const e = ownerMap.get(k) ?? { id: t.owner_id ?? null, name: t.owner?.full_name ?? 'Unassigned', count: 0 }
+    e.count++; ownerMap.set(k, e)
+  }
+  const ownerRows = [...ownerMap.values()].sort((a, b) => b.count - a.count)
+
+  const clientMap = new Map<string, number>()
+  for (const t of openTasks as any[]) {
+    const n = t.client?.name ?? 'Internal'
+    clientMap.set(n, (clientMap.get(n) ?? 0) + 1)
+  }
+  const clientRows = [...clientMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -110,28 +122,48 @@ export default async function DashboardPage() {
         {openTasks.length === 0 ? (
           <div className="text-sm text-[#9398A1] border border-dashed border-[#ECECEE] rounded-xl px-4 py-6 text-center">No open tasks.</div>
         ) : (
-          <div className="border border-[#ECECEE] rounded-xl bg-white p-4">
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-3">
-              {taskStatusCounts.map((c) => (
-                <span key={c.status} className="inline-flex items-center gap-1.5 text-xs text-[#5A5E66]">
-                  <span className="w-2 h-2 rounded-full" style={{ background: STATUS_COLOUR[c.status] ?? '#A6ABB3' }} />
-                  {c.status} · {c.count}
-                </span>
-              ))}
-            </div>
-            {urgentTasks.length > 0 && (
-              <ul className="flex flex-col gap-1.5 border-t border-[#ECECEE] pt-3">
-                {urgentTasks.map((t: any) => {
-                  const overdue = t.due_date && t.due_date < todayISO
-                  return (
-                    <li key={t.id} className="flex items-center justify-between gap-3 text-sm">
-                      <span className="truncate">{t.title}<span className="text-[#9398A1]"> · {t.owner?.full_name ?? 'Unassigned'}</span></span>
-                      <span className={`text-xs shrink-0 ${overdue ? 'text-[#E0572E] font-semibold' : 'text-[#9398A1]'}`}>{t.due_date ? fmtDate(t.due_date) : t.priority}</span>
-                    </li>
-                  )
-                })}
-              </ul>
+          <div className="flex flex-col gap-3">
+            {overdueCount > 0 && (
+              <Link href="/tasks" className="block rounded-xl border border-[#E0572E]/30 bg-[#E0572E]/5 px-4 py-3 hover:bg-[#E0572E]/10">
+                <span className="text-lg font-bold text-[#E0572E]">{overdueCount}</span>
+                <span className="text-sm text-[#E0572E]"> overdue {overdueCount === 1 ? 'task' : 'tasks'}</span>
+              </Link>
             )}
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div className="border border-[#ECECEE] rounded-xl bg-white p-4">
+                <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2.5">By status</div>
+                <div className="flex flex-col gap-1.5">
+                  {taskStatusCounts.map((c) => (
+                    <Link key={c.status} href={`/tasks?status=${encodeURIComponent(c.status)}`} className="flex items-center justify-between gap-2 text-sm hover:underline">
+                      <span className="inline-flex items-center gap-1.5 text-[#5A5E66]"><span className="w-2 h-2 rounded-full" style={{ background: STATUS_COLOUR[c.status] ?? '#A6ABB3' }} />{c.status}</span>
+                      <span className="text-[#15171C] font-medium">{c.count}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+              <div className="border border-[#ECECEE] rounded-xl bg-white p-4">
+                <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2.5">By owner</div>
+                <div className="flex flex-col gap-1.5">
+                  {ownerRows.map((o) => {
+                    const content = <><span className="text-[#5A5E66] truncate">{o.name}</span><span className="text-[#15171C] font-medium">{o.count}</span></>
+                    return o.id
+                      ? <Link key={o.id} href={`/tasks?owner=${o.id}`} className="flex items-center justify-between gap-2 text-sm hover:underline">{content}</Link>
+                      : <div key="none" className="flex items-center justify-between gap-2 text-sm">{content}</div>
+                  })}
+                </div>
+              </div>
+              <div className="border border-[#ECECEE] rounded-xl bg-white p-4">
+                <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2.5">By client</div>
+                <div className="flex flex-col gap-1.5">
+                  {clientRows.map((c) => (
+                    <div key={c.name} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-[#5A5E66] truncate">{c.name}</span>
+                      <span className="text-[#15171C] font-medium">{c.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </section>

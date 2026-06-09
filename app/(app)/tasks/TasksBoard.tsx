@@ -1,49 +1,21 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Check, Pencil, Trash2 } from 'lucide-react'
-import {
-  TASK_TYPES, TASK_STATUSES, TASK_PRIORITIES, STATUS_COLOUR, PRIORITY_COLOUR,
-} from '@/lib/taskConstants'
+import { TASK_TYPES, TASK_STATUSES, TASK_PRIORITIES, STATUS_COLOUR, PRIORITY_COLOUR } from '@/lib/taskConstants'
 import { createTaskAction, updateTaskAction, deleteTaskAction, type TaskInput } from '../taskActions'
+import { fmtTaskDate, taskToday, taskToInput, type Task, type Member, type ClientOpt } from './types'
+import TaskKanban from './TaskKanban'
+import TaskCalendar from './TaskCalendar'
 
-type ServesPost = { title: string; href: string | null }
-type Task = {
-  id: string
-  client_id: string | null
-  content_item_id: string | null
-  task_type: string | null
-  title: string
-  owner_id: string | null
-  status: string
-  priority: string
-  due_date: string | null
-  next_action: string | null
-  notes: string | null
-  clientName: string | null
-  clientColour: string | null
-  ownerName: string | null
-  servesPost: ServesPost | null
-}
-type Member = { id: string; full_name: string; user_id: string | null }
-type ClientOpt = { id: string; name: string; colour: string }
 type Prefill = { contentItemId: string; clientId: string | null; postTitle: string }
-
+type View = 'list' | 'kanban' | 'calendar'
+const VIEWS: View[] = ['list', 'kanban', 'calendar']
 const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-2.5 py-1.5 text-sm bg-white'
 const PRIORITY_RANK: Record<string, number> = { Urgent: 0, High: 1, Medium: 2, Low: 3 }
-
-function toInput(t: Task): TaskInput {
-  return {
-    client_id: t.client_id, task_type: t.task_type, title: t.title, owner_id: t.owner_id,
-    status: t.status, priority: t.priority, due_date: t.due_date, next_action: t.next_action,
-    notes: t.notes, content_item_id: t.content_item_id,
-  }
-}
-function fmtDate(d: string | null) {
-  return d ? new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'
-}
-const todayStr = () => new Date().toISOString().slice(0, 10)
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function Pill({ value, colour }: { value: string; colour: string }) {
   return (
@@ -64,7 +36,7 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
   onClose: () => void
   onSaved: () => void
 }) {
-  const [form, setForm] = useState<TaskInput>(task ? toInput(task) : {
+  const [form, setForm] = useState<TaskInput>(task ? taskToInput(task) : {
     client_id: null, task_type: null, title: '', owner_id: null,
     status: 'Not Started', priority: 'Medium', due_date: null, next_action: null, notes: null,
     content_item_id: null, ...seed,
@@ -72,12 +44,9 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const set = <K extends keyof TaskInput>(k: K, v: TaskInput[K]) => setForm((f) => ({ ...f, [k]: v }))
-
-  // Changing client re-suggests the owner from that client's Lead PM (a default, not a lock).
   function onClientChange(clientId: string | null) {
     setForm((f) => ({ ...f, client_id: clientId, owner_id: clientId ? leadPmByClient[clientId] ?? null : f.owner_id }))
   }
-
   async function submit() {
     if (!form.title.trim()) { setError('Title is required.'); return }
     setPending(true); setError(null)
@@ -158,7 +127,7 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
 
 type ModalState = { open: boolean; task: Task | null; seed?: Partial<TaskInput>; servesLabel: string | null }
 
-export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient, currentUserId, loadError, prefill }: {
+export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient, currentUserId, loadError, prefill, initialView, initialOwner, initialStatus }: {
   tasks: Task[]
   teamMembers: Member[]
   clients: ClientOpt[]
@@ -166,26 +135,41 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
   currentUserId: string
   loadError: boolean
   prefill: Prefill | null
+  initialView: View
+  initialOwner: string
+  initialStatus: string
 }) {
-  const [ownerFilter, setOwnerFilter] = useState<string>('')
-  const [statusFilter, setStatusFilter] = useState<string>('')
+  const router = useRouter()
+  const [view, setViewState] = useState<View>(initialView)
+  const [ownerFilter, setOwnerFilter] = useState<string>(initialOwner)
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatus)
   const [sort, setSort] = useState<'due' | 'priority' | 'status' | 'title'>('due')
   const [modal, setModal] = useState<ModalState>(() =>
     prefill
-      ? {
-          open: true, task: null, servesLabel: prefill.postTitle,
-          seed: { content_item_id: prefill.contentItemId, client_id: prefill.clientId, owner_id: prefill.clientId ? leadPmByClient[prefill.clientId] ?? null : null },
-        }
+      ? { open: true, task: null, servesLabel: prefill.postTitle, seed: { content_item_id: prefill.contentItemId, client_id: prefill.clientId, owner_id: prefill.clientId ? leadPmByClient[prefill.clientId] ?? null : null } }
       : { open: false, task: null, servesLabel: null },
   )
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
+  // Local copy for optimistic kanban moves; re-syncs whenever the server data changes.
+  const [localTasks, setLocalTasks] = useState(tasks)
+  const syncKey = tasks.map((t) => `${t.id}:${t.status}`).join('|')
+  useEffect(() => { setLocalTasks(tasks) }, [syncKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // View choice in the URL (shareable/refresh-safe) without a server re-fetch.
+  function changeView(v: View) {
+    setViewState(v)
+    const sp = new URLSearchParams(window.location.search)
+    sp.set('view', v)
+    window.history.replaceState(null, '', `?${sp.toString()}`)
+  }
+
   const myMemberId = useMemo(() => teamMembers.find((m) => m.user_id === currentUserId)?.id ?? null, [teamMembers, currentUserId])
-  const today = todayStr()
+  const today = taskToday()
 
   const visible = useMemo(() => {
-    const filtered = tasks.filter((t) => {
+    const filtered = localTasks.filter((t) => {
       if (ownerFilter === 'me') { if (t.owner_id !== myMemberId) return false }
       else if (ownerFilter && t.owner_id !== ownerFilter) return false
       if (statusFilter && t.status !== statusFilter) return false
@@ -198,7 +182,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
       title: (a, b) => a.title.localeCompare(b.title),
     }
     return [...filtered].sort(cmp[sort])
-  }, [tasks, ownerFilter, statusFilter, sort, myMemberId])
+  }, [localTasks, ownerFilter, statusFilter, sort, myMemberId])
 
   async function run(id: string, p: Promise<{ error: string | null }>) {
     setBusyId(id); setActionError(null)
@@ -207,10 +191,27 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
     if (r.error) setActionError(r.error)
   }
 
+  // Kanban move: optimistic, persisted via update_task; revert (re-fetch) on error.
+  async function onMove(task: Task, status: string) {
+    setActionError(null)
+    setLocalTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status } : t)))
+    const r = await updateTaskAction(task.id, { ...taskToInput(task), status })
+    if (r.error) { setActionError(r.error); router.refresh() }
+  }
+
+  function openEdit(t: Task) { setModal({ open: true, task: t, servesLabel: t.servesPost?.title ?? null }) }
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <h1 className="text-2xl font-bold">Tasks</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">Tasks</h1>
+          <div className="inline-flex rounded-lg border border-[#E2E2E5] overflow-hidden text-sm">
+            {VIEWS.map((v) => (
+              <button key={v} onClick={() => changeView(v)} className={`px-3 py-1.5 cursor-pointer ${view === v ? 'bg-[#15171C] text-white font-semibold' : 'text-[#5A5E66] hover:bg-[#F4F4F6]'}`}>{cap(v)}</button>
+            ))}
+          </div>
+        </div>
         <button onClick={() => setModal({ open: true, task: null, servesLabel: null })} className="bg-[#15171C] text-white rounded-lg px-3.5 py-2 text-sm font-semibold cursor-pointer">New task</button>
       </div>
 
@@ -224,13 +225,15 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
           <option value="">All statuses</option>
           {TASK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="rounded-lg border border-[#E2E2E5] px-3 py-2 text-sm text-[#5A5E66] cursor-pointer">
-          <option value="due">Sort: Due date</option>
-          <option value="priority">Sort: Priority</option>
-          <option value="status">Sort: Status</option>
-          <option value="title">Sort: Title</option>
-        </select>
-        <span className="text-xs text-[#9398A1] ml-auto">{visible.length} of {tasks.length}</span>
+        {view === 'list' && (
+          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="rounded-lg border border-[#E2E2E5] px-3 py-2 text-sm text-[#5A5E66] cursor-pointer">
+            <option value="due">Sort: Due date</option>
+            <option value="priority">Sort: Priority</option>
+            <option value="status">Sort: Status</option>
+            <option value="title">Sort: Title</option>
+          </select>
+        )}
+        <span className="text-xs text-[#9398A1] ml-auto">{visible.length} of {localTasks.length}</span>
       </div>
 
       {loadError && (
@@ -238,62 +241,68 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
       )}
       {actionError && <div className="mb-4 text-sm text-red-600">{actionError}</div>}
 
-      <div className="border border-[#ECECEE] rounded-2xl bg-white overflow-x-auto">
-        <table className="w-full min-w-[860px] text-sm">
-          <thead>
-            <tr className="text-left text-[11px] uppercase tracking-wide text-[#9398A1] border-b border-[#ECECEE]">
-              <th className="font-semibold px-4 py-2.5">Task</th>
-              <th className="font-semibold px-3 py-2.5">Client</th>
-              <th className="font-semibold px-3 py-2.5">Type</th>
-              <th className="font-semibold px-3 py-2.5">Owner</th>
-              <th className="font-semibold px-3 py-2.5">Status</th>
-              <th className="font-semibold px-3 py-2.5">Priority</th>
-              <th className="font-semibold px-3 py-2.5">Due</th>
-              <th className="font-semibold px-3 py-2.5">Next action</th>
-              <th className="px-3 py-2.5"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-[#9398A1]">No tasks.</td></tr>
-            ) : visible.map((t) => {
-              const overdue = t.due_date && t.due_date < today && t.status !== 'Complete'
-              return (
-                <tr key={t.id} className="border-b border-[#ECECEE] last:border-b-0 hover:bg-[#FBFBFC]">
-                  <td className="px-4 py-2.5">
-                    <div className="font-medium">{t.title}</div>
-                    {t.servesPost && (
-                      t.servesPost.href
-                        ? <Link href={t.servesPost.href} className="text-xs text-[#5A5E66] hover:underline">↗ {t.servesPost.title}</Link>
-                        : <span className="text-xs text-[#9398A1]">↗ {t.servesPost.title}</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {t.clientName ? (
-                      <span className="inline-flex items-center gap-1.5 text-[#5A5E66]"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: t.clientColour ?? '#A6ABB3' }} />{t.clientName}</span>
-                    ) : <span className="text-[#9398A1]">Internal</span>}
-                  </td>
-                  <td className="px-3 py-2.5 text-[#5A5E66]">{t.task_type ?? '—'}</td>
-                  <td className="px-3 py-2.5 text-[#5A5E66]">{t.ownerName ?? <span className="text-[#9398A1]">Unassigned</span>}</td>
-                  <td className="px-3 py-2.5"><Pill value={t.status} colour={STATUS_COLOUR[t.status] ?? '#A6ABB3'} /></td>
-                  <td className="px-3 py-2.5"><Pill value={t.priority} colour={PRIORITY_COLOUR[t.priority] ?? '#9398A1'} /></td>
-                  <td className={`px-3 py-2.5 whitespace-nowrap ${overdue ? 'text-[#E0572E] font-semibold' : 'text-[#5A5E66]'}`}>{fmtDate(t.due_date)}</td>
-                  <td className="px-3 py-2.5 text-[#5A5E66] max-w-[200px] truncate">{t.next_action ?? '—'}</td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-1 justify-end">
-                      {t.status !== 'Complete' && (
-                        <button onClick={() => run(t.id, updateTaskAction(t.id, { ...toInput(t), status: 'Complete' }))} disabled={busyId === t.id} aria-label="Mark complete" title="Mark complete" className="p-1 text-[#9398A1] hover:text-[#16A34A] cursor-pointer disabled:opacity-50"><Check size={15} /></button>
+      {view === 'kanban' ? (
+        <TaskKanban tasks={visible} onMove={onMove} onEdit={openEdit} />
+      ) : view === 'calendar' ? (
+        <TaskCalendar tasks={visible} onEdit={openEdit} />
+      ) : (
+        <div className="border border-[#ECECEE] rounded-2xl bg-white overflow-x-auto">
+          <table className="w-full min-w-[860px] text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wide text-[#9398A1] border-b border-[#ECECEE]">
+                <th className="font-semibold px-4 py-2.5">Task</th>
+                <th className="font-semibold px-3 py-2.5">Client</th>
+                <th className="font-semibold px-3 py-2.5">Type</th>
+                <th className="font-semibold px-3 py-2.5">Owner</th>
+                <th className="font-semibold px-3 py-2.5">Status</th>
+                <th className="font-semibold px-3 py-2.5">Priority</th>
+                <th className="font-semibold px-3 py-2.5">Due</th>
+                <th className="font-semibold px-3 py-2.5">Next action</th>
+                <th className="px-3 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.length === 0 ? (
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-[#9398A1]">No tasks.</td></tr>
+              ) : visible.map((t) => {
+                const overdue = t.due_date && t.due_date < today && t.status !== 'Complete'
+                return (
+                  <tr key={t.id} className="border-b border-[#ECECEE] last:border-b-0 hover:bg-[#FBFBFC]">
+                    <td className="px-4 py-2.5">
+                      <div className="font-medium">{t.title}</div>
+                      {t.servesPost && (
+                        t.servesPost.href
+                          ? <Link href={t.servesPost.href} className="text-xs text-[#5A5E66] hover:underline">↗ {t.servesPost.title}</Link>
+                          : <span className="text-xs text-[#9398A1]">↗ {t.servesPost.title}</span>
                       )}
-                      <button onClick={() => setModal({ open: true, task: t, servesLabel: t.servesPost?.title ?? null })} aria-label="Edit" className="p-1 text-[#9398A1] hover:text-[#15171C] cursor-pointer"><Pencil size={14} /></button>
-                      <button onClick={() => { if (confirm('Delete this task?')) run(t.id, deleteTaskAction(t.id)) }} disabled={busyId === t.id} aria-label="Delete" className="p-1 text-[#9398A1] hover:text-[#E0572E] cursor-pointer disabled:opacity-50"><Trash2 size={14} /></button>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {t.clientName ? (
+                        <span className="inline-flex items-center gap-1.5 text-[#5A5E66]"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: t.clientColour ?? '#A6ABB3' }} />{t.clientName}</span>
+                      ) : <span className="text-[#9398A1]">Internal</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-[#5A5E66]">{t.task_type ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-[#5A5E66]">{t.ownerName ?? <span className="text-[#9398A1]">Unassigned</span>}</td>
+                    <td className="px-3 py-2.5"><Pill value={t.status} colour={STATUS_COLOUR[t.status] ?? '#A6ABB3'} /></td>
+                    <td className="px-3 py-2.5"><Pill value={t.priority} colour={PRIORITY_COLOUR[t.priority] ?? '#9398A1'} /></td>
+                    <td className={`px-3 py-2.5 whitespace-nowrap ${overdue ? 'text-[#E0572E] font-semibold' : 'text-[#5A5E66]'}`}>{fmtTaskDate(t.due_date)}</td>
+                    <td className="px-3 py-2.5 text-[#5A5E66] max-w-[200px] truncate">{t.next_action ?? '—'}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1 justify-end">
+                        {t.status !== 'Complete' && (
+                          <button onClick={() => run(t.id, updateTaskAction(t.id, { ...taskToInput(t), status: 'Complete' }))} disabled={busyId === t.id} aria-label="Mark complete" title="Mark complete" className="p-1 text-[#9398A1] hover:text-[#16A34A] cursor-pointer disabled:opacity-50"><Check size={15} /></button>
+                        )}
+                        <button onClick={() => openEdit(t)} aria-label="Edit" className="p-1 text-[#9398A1] hover:text-[#15171C] cursor-pointer"><Pencil size={14} /></button>
+                        <button onClick={() => { if (confirm('Delete this task?')) run(t.id, deleteTaskAction(t.id)) }} disabled={busyId === t.id} aria-label="Delete" className="p-1 text-[#9398A1] hover:text-[#E0572E] cursor-pointer disabled:opacity-50"><Trash2 size={14} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {modal.open && (
         <TaskModal
