@@ -4,7 +4,9 @@ import EditClientForm from './EditClientForm'
 import ChannelsSection, { type Channel } from './ChannelsSection'
 import ContactsSection, { type Contact } from './ContactsSection'
 import BrandAssetsSection, { type BrandAsset } from './BrandAssetsSection'
+import OwnershipSection from './OwnershipSection'
 import type { ClientDefaults, TeamOption } from '../ClientFormFields'
+import type { Ownership } from '@/lib/ownershipRoles'
 
 type Internal = {
   account_owner_id: string | null
@@ -65,6 +67,12 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
     .eq('client_id', id)
     .order('kind')
 
+  const { data: ownership } = await supabase
+    .from('client_ownership')
+    .select('lead_pm_id, comms_backup_id, creative_lead_id, design_owner_id, content_owner_id, video_owner_id, sales_ops_id, intern_support_id')
+    .eq('client_id', id)
+    .maybeSingle()
+
   const defaults: ClientDefaults = {
     name: client.name,
     status: client.status,
@@ -101,6 +109,14 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
 
       <div className="max-w-[680px] mt-10">
         <BrandAssetsSection clientId={client.id} assets={(assets as BrandAsset[] | null) ?? []} />
+      </div>
+
+      <div className="max-w-[680px] mt-10">
+        <OwnershipSection
+          clientId={client.id}
+          ownership={(ownership as Ownership | null) ?? null}
+          teamMembers={(team as TeamOption[] | null) ?? []}
+        />
       </div>
     </>
   )

@@ -47,12 +47,17 @@ export default async function ClientsPage() {
           <div className="text-xl font-bold">Clients</div>
           <div className="text-sm text-[#5A5E66]">{rows.length} {rows.length === 1 ? 'client' : 'clients'}</div>
         </div>
-        <Link
-          href="/clients/new"
-          className="text-sm bg-[#15171C] text-white rounded-lg px-3.5 py-2 font-semibold"
-        >
-          New client
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/clients/ownership" className="text-sm border border-[#E2E2E5] text-[#5A5E66] rounded-lg px-3.5 py-2 font-medium hover:bg-[#F4F4F6]">
+            Ownership matrix
+          </Link>
+          <Link
+            href="/clients/new"
+            className="text-sm bg-[#15171C] text-white rounded-lg px-3.5 py-2 font-semibold"
+          >
+            New client
+          </Link>
+        </div>
       </div>
 
       {rows.length === 0 ? (
