@@ -1,6 +1,6 @@
 'use client'
 
-import { Image as ImageIcon } from 'lucide-react'
+import { Image as ImageIcon, Link2 } from 'lucide-react'
 import { maltaDate, mondayOf, monthOf } from '@/lib/week'
 import { textOn } from '@/lib/colour'
 import { STATUS, type Item } from './Calendar'
@@ -90,8 +90,11 @@ export default function MonthCalendar({
                       >
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.dot, boxShadow: `0 0 0 1px ${ring}` }} />
                         <span className="truncate min-w-0">{label}</span>
-                        {it.media && it.media.length > 0 && (
-                          <ImageIcon size={11} aria-label="Has media" className="shrink-0 ml-auto" style={{ opacity: 0.75 }} />
+                        {((it.media && it.media.length > 0) || (it.asset_links && it.asset_links.length > 0)) && (
+                          <span className="shrink-0 ml-auto flex items-center gap-0.5" style={{ opacity: 0.75 }}>
+                            {it.media && it.media.length > 0 && <ImageIcon size={11} aria-label="Has media" />}
+                            {it.asset_links && it.asset_links.length > 0 && <Link2 size={11} aria-label="Has asset links" />}
+                          </span>
                         )}
                       </button>
                     )

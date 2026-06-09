@@ -1,4 +1,5 @@
 'use client'
+import { Link2 } from 'lucide-react'
 import { maltaDate } from '@/lib/week'
 import { textOn } from '@/lib/colour'
 import MediaThumb from './MediaThumb'
@@ -9,6 +10,13 @@ export type Media = {
   mime_type: string | null
   created_at: string
   url: string | null
+}
+
+export type AssetLink = {
+  id: string
+  label: string
+  url: string
+  sort_order: number
 }
 
 export type ApprovalEvent = {
@@ -56,6 +64,7 @@ export type Item = {
   versions?: VersionDetail[]
   clientColour?: string
   clientName?: string
+  asset_links?: AssetLink[]
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -141,6 +150,7 @@ export default function Calendar({
                   <div className="flex items-center gap-1.5 text-[11px]" style={{ opacity: 0.9 }}>
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.dot, boxShadow: `0 0 0 1.5px ${ring}` }} />
                     {s.label}
+                    {it.asset_links && it.asset_links.length > 0 && <Link2 size={12} aria-label="Has asset links" className="ml-auto shrink-0" />}
                   </div>
                 </button>
               )

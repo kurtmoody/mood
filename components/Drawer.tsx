@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { STATUS, type Item } from './Calendar'
 import MediaSection from './MediaSection'
+import AssetLinksSection from './AssetLinksSection'
 import VersionHistory from './VersionHistory'
 import ClientVersionHistory from './ClientVersionHistory'
 
@@ -322,6 +323,12 @@ export default function Drawer({
             clientId={clientId}
             contentItemId={item.id}
             versionId={item.current_version_id}
+          />
+
+          <AssetLinksSection
+            links={item.asset_links ?? []}
+            isAgency={isAgency}
+            contentItemId={item.id}
           />
 
           {visibleActions.length > 0 && (
