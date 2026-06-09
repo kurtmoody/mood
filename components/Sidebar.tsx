@@ -62,7 +62,10 @@ export default function Sidebar({
         } ${expanded ? 'lg:w-60' : 'lg:w-16'} ${!pinned && hovered ? 'lg:shadow-xl' : ''}`}
       >
         <div className="h-14 flex items-center justify-between gap-2 px-4 border-b border-[#ECECEE]">
-          <span className="font-bold text-lg whitespace-nowrap">Mood</span>
+          <Link href="/" aria-label="Mood home" className="shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Mood" className="h-7 w-auto" />
+          </Link>
           {expanded && (
             <button
               onClick={onTogglePin}
