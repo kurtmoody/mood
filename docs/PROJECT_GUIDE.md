@@ -1,6 +1,6 @@
 # Mood — Project Guide
 
-**Status:** Internal build, actively developed. Last updated 2026-06-09 (migration 0032).
+**Status:** Internal build, actively developed. Last updated 2026-06-09 (migration 0033).
 **Audience:** Engineers, product managers, and anyone picking this project up at any point.
 **Scope of this document:** A complete reference for what Mood is, how it's built, and how to operate it. It is the single source of truth for architecture, the data/security model, every shipped feature, the full RPC and migration ledger, conventions, and the operational runbook.
 
@@ -24,7 +24,7 @@
 12. [Notifications (bell + email)](#12-notifications)
 13. [Feature inventory](#13-feature-inventory)
 14. [RPC reference](#14-rpc-reference)
-15. [Migration ledger (0001–0032)](#15-migration-ledger)
+15. [Migration ledger (0001–0033)](#15-migration-ledger)
 16. [Conventions & hard-won gotchas](#16-conventions--hard-won-gotchas)
 17. [Testing (pgTap)](#17-testing-pgtap)
 18. [Operational runbook](#18-operational-runbook)
@@ -373,8 +373,10 @@ All via SECURITY DEFINER RPCs.
 - **Content ↔ task bridge (0031)** — a post's drawer lists its linked tasks + **"Add task for this post"** (opens the task modal prefilled with the post's client + `content_item_id`); the task list/modal show which post a task **serves** (links back to it). New tasks **default their owner to the client's Lead PM** (`client_ownership.lead_pm_id`) when a client is picked — editable, not a lock. Manual only (no auto-spawn yet).
 - **RACI matrix (0027, editable 0032)** — the responsibility grid, now **editable in the Admin area** (`/admin/raci`) via `set_raci_matrix`. Seeded for Mood Agency.
 
-### Admin area (0032)
-`/admin` — **agency_admin only** (nav `adminOnly`, `admin/layout.tsx` hard-redirect, and the RPC re-checks admin server-side). A settings landing structured to grow (just a `SECTIONS` array today); first module is the **RACI matrix editor** (`/admin/raci`): a 15 × N grid of dropdowns (`—`/A/R/S/C/I/A/R), prefilled, one **Save** → replace-all.
+### Admin area (0032, 0033)
+`/admin` — **agency_admin only** (nav `adminOnly`, `admin/layout.tsx` hard-redirect, and the RPCs re-check admin server-side). A settings landing structured to grow (a `SECTIONS` array):
+- **RACI matrix editor** (`/admin/raci`, 0032) — a 15 × N grid of dropdowns (`—`/A/R/S/C/I/A/R), prefilled, one **Save** → replace-all via `set_raci_matrix`.
+- **Team access** (`/admin/access`, 0033) — lists agency users (via `list_agency_members`) with an Admin/Member toggle per person (`set_member_role`); the **last admin's toggle is disabled** ("At least one admin is required"), mirroring the RPC's lockout guard.
 
 ### Approval & versioning
 - Client Approve / Request-changes surfaced in the drawer for `client_review` posts (role-aware action set; note required for request_changes).
@@ -391,7 +393,7 @@ Data layer + emit (0019), enriched copy (0023), in-app bell, email Edge Function
 `/dashboard` (agency-only): a cross-client "needs attention" view aggregating `content_item` across **all** the agency's clients via RLS (no client filter). Sections — "Needs your action" (`internal_review`/`changes_requested`), "Awaiting client" (`client_review`, flagging items aged > 3 days), and a richer **task summary**: a prominent **overdue count** plus open-task breakdowns **By status** (→ `/tasks?status=`), **By owner** (→ `/tasks?owner=`), and **By client**. Each content row deep-links to the post. Read-only.
 
 ### Security (all pgTap-proven)
-Content read floor (0015), content tables RPC-only (0016), client transitions (0017), media table + storage policies (0018), notification RLS (0019), revoke (0020), versioning guards (0021), client version filter (0022), media reorder authorisation (0024), asset-link read floor + RPC auth (0026), task RLS + RPC auth (0028), client_ownership RLS + RPC auth (0030), RACI admin-write auth (0032).
+Content read floor (0015), content tables RPC-only (0016), client transitions (0017), media table + storage policies (0018), notification RLS (0019), revoke (0020), versioning guards (0021), client version filter (0022), media reorder authorisation (0024), asset-link read floor + RPC auth (0026), task RLS + RPC auth (0028), client_ownership RLS + RPC auth (0030), RACI admin-write auth (0032), member-role admin-write + last-admin lockout (0033).
 
 ---
 
@@ -431,11 +433,13 @@ All RPCs are `SECURITY DEFINER` with `set search_path=''` and an `auth.uid()` nu
 | `update_task` | `(task_id, … same fields incl. content_item_id …) → void` | agency member of the task's agency | **Full replace** (sets `updated_at`); mark-complete re-sends all fields with `status = 'Complete'`; kanban drag re-sends with the new `status`. |
 | `delete_task` | `(task_id) → void` | agency member of the task's agency | |
 
-### Admin (0030, 0032)
+### Admin (0030, 0032, 0033)
 | RPC | Signature | Auth | Notes |
 |---|---|---|---|
 | `set_client_ownership` | `(client_id, lead_pm_id?, comms_backup_id?, creative_lead_id?, design_owner_id?, content_owner_id?, video_owner_id?, sales_ops_id?, intern_support_id?) → void` | agency-for-client | Upsert (1:1); validates every assignee belongs to the client's agency. |
 | `set_raci_matrix` | `(agency_id, cells jsonb) → void` | **agency_admin of that agency** | Transactional replace-all of the grid; validates team members; skips blank cells. |
+| `set_member_role` | `(target_user_id, agency_id, role) → void` | **agency_admin of that agency** | Promote/demote between `agency_admin`/`agency_member`; validates the role + existing membership; **last-admin lockout**; casts `role::member_role`. |
+| `list_agency_members` | `(agency_id) → table(user_id, role, full_name, email)` | **agency_admin of that agency** | Read helper — `membership` is own-rows-only under RLS; resolves name from `team_member`, email from `auth.users`. |
 
 ### Portal & CRM
 | RPC | Signature | Auth |
@@ -494,6 +498,7 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 | 0030 | client_ownership (+test) | `client_ownership` 1:1 table (agency-only, internal staffing) + `set_client_ownership` upsert RPC. |
 | 0031 | task_content_link | `task.content_item_id` (nullable, on delete set null); `create_task`/`update_task` gain `p_content_item_id` (drop+recreate). |
 | 0032 | raci_edit (+test) | `set_raci_matrix` RPC — agency_admin-only transactional replace-all of the grid. No table change. |
+| 0033 | set_member_role (+test) | `set_member_role` (admin-only promote/demote with last-admin lockout) + `list_agency_members` read helper. No table change. |
 
 > `schema.sql` is the fresh-setup reference **only** — it has a destructive reset block at the top; **never run it against the live DB.** New changes go in a migration.
 
@@ -565,7 +570,7 @@ Then ensure a **Database Webhook** exists on `public.notification` (event INSERT
 ## 19. Open items & roadmap
 
 ### Open (not built)
-1. **Permission-management UI / finer permissions** *(security/access)* — the `agency_admin` vs `agency_member` split is now enforced for the Admin area (0032), but other agency pages still gate on *any* agency membership. Extend the `isAgencyAdmin` gate to other destructive actions (delete client, billing, manage team) and add a UI to manage who's an admin.
+1. **Finer permissions** *(security/access)* — admin/member is now enforced and **manageable** (Admin → Team access, `set_member_role`, 0033, with a last-admin lockout). What's still open: most agency pages gate on *any* agency membership, so extend the `isAgencyAdmin` gate to other destructive actions (delete client, billing, manage team).
 2. **Task-system future slices** — **subtasks/checklists**; **client-facing task sharing** (selected tasks visible in the portal — `task` is internal-only by design today); **auto-spawn from templates** (create the standard task set for a new post/client); a **gantt/timeline** view. (Kanban, the task calendar, and the content↔task bridge are done.)
 3. **@mentions** — mention internal (`team_member`) and external (`client_contact`/portal) people on comments (and later other objects), stored as **structured rows** (not parsed from text), emitted from the existing RPC write paths.
 4. **Bell realtime** — currently polls on open; add Supabase realtime for live unread updates.
@@ -602,4 +607,4 @@ Client Approve/Request-changes UI · snapshot-on-send versioning · agency + cli
 
 ---
 
-*This document reflects the codebase at migration 0032. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*
+*This document reflects the codebase at migration 0033. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*
