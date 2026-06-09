@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Calendar, { STATUS, type Item } from '@/components/Calendar'
 import MonthCalendar from '@/components/MonthCalendar'
-import ClientSwitcher from '@/components/ClientSwitcher'
 import FilterMenu from '@/components/FilterMenu'
 import Drawer from '@/components/Drawer'
 import NewPostForm from './NewPostForm'
@@ -13,12 +12,13 @@ import { addCommentAction, deleteCommentAction } from './commentActions'
 import { updatePostAction } from './postActions'
 import { addDays, addMonths, mondayOf, monthOf, monthGridDates, monthLabel, weekDates, weekRangeLabel } from '@/lib/week'
 
-type ClientOption = { id: string; name: string }
+type ClientOption = { id: string; name: string; colour: string }
 type Channel = { id: string; type: string; label: string | null }
 
 export default function CalendarBoard({
   clients,
-  selectedClientId,
+  selectedClientIds,
+  defaultClientId,
   channelsByClient,
   posts,
   view,
@@ -31,7 +31,8 @@ export default function CalendarBoard({
   loadError,
 }: {
   clients: ClientOption[]
-  selectedClientId: string
+  selectedClientIds: string[]
+  defaultClientId: string
   channelsByClient: Record<string, Channel[]>
   posts: Item[]
   view: 'week' | 'month'
@@ -120,9 +121,24 @@ export default function CalendarBoard({
     setChannelFilter(new Set())
   }
 
+  // Client selection lives in the URL (?clients=) so it persists and scopes the query.
+  // Toggling navigates; selecting all (or none) clears the param back to the default.
+  function setClients(ids: string[]) {
+    const sp = new URLSearchParams(params.toString())
+    if (ids.length === 0 || ids.length === clients.length) sp.delete('clients')
+    else sp.set('clients', ids.join(','))
+    sp.delete('client') // drop any single-client deep-link param
+    router.push(`/?${sp.toString()}`)
+  }
+  function toggleClient(id: string) {
+    const set = new Set(selectedClientIds)
+    if (set.has(id)) set.delete(id)
+    else set.add(id)
+    setClients([...set])
+  }
+
   function go(overrides: Record<string, string>) {
     const sp = new URLSearchParams(params.toString())
-    sp.set('client', selectedClientId)
     for (const [k, v] of Object.entries(overrides)) sp.set(k, v)
     router.push(`/?${sp.toString()}`)
   }
@@ -153,7 +169,11 @@ export default function CalendarBoard({
     <>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <ClientSwitcher clients={clients} current={selectedClientId} />
+          <div className="text-xl font-bold">
+            {selectedClientIds.length === 1
+              ? clients.find((c) => c.id === selectedClientIds[0])?.name ?? 'Calendar'
+              : 'All clients'}
+          </div>
           <div className="text-sm text-[#5A5E66] mt-1.5">
             {view === 'week' ? weekRangeLabel(monday) : monthLabel(month)}
           </div>
@@ -180,6 +200,15 @@ export default function CalendarBoard({
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
+        {clients.length > 1 && (
+          <FilterMenu
+            label="Clients"
+            options={clients.map((c) => ({ value: c.id, label: c.name }))}
+            selected={new Set(selectedClientIds)}
+            onToggle={toggleClient}
+            onClear={() => setClients([])}
+          />
+        )}
         <FilterMenu
           label="Status"
           options={statusOptions}
@@ -211,6 +240,17 @@ export default function CalendarBoard({
           </div>
         )}
       </div>
+
+      {selectedClientIds.length > 1 && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[#5A5E66]">
+          {clients.filter((c) => selectedClientIds.includes(c.id)).map((c) => (
+            <span key={c.id} className="inline-flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm" style={{ background: c.colour }} />
+              {c.name}
+            </span>
+          ))}
+        </div>
+      )}
 
       {loadError && (
         <div className="mb-4 rounded-lg border border-[#E0572E]/30 bg-[#E0572E]/5 px-4 py-2.5 text-sm text-[#E0572E]">
@@ -245,8 +285,8 @@ export default function CalendarBoard({
         updatePostAction={updatePostAction}
         addCommentAction={addCommentAction}
         deleteCommentAction={deleteCommentAction}
-        channels={channelsByClient[selectedClientId] ?? []}
-        clientId={selectedClientId}
+        channels={selected?.client_id ? channelsByClient[selected.client_id] ?? [] : []}
+        clientId={selected?.client_id ?? defaultClientId}
         currentUserId={currentUserId}
         isAgency={isAgency}
       />
@@ -255,7 +295,7 @@ export default function CalendarBoard({
         <NewPostForm
           clients={clients}
           channelsByClient={channelsByClient}
-          defaultClientId={selectedClientId}
+          defaultClientId={defaultClientId}
           defaultDate={formDate}
           onClose={() => setFormDate(null)}
         />

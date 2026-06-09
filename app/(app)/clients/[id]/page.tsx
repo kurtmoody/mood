@@ -32,7 +32,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
 
   const { data: client } = await supabase
     .from('client')
-    .select('id, name, status, website, industry, timezone, brand_colour, client_internal ( account_owner_id, notes, billing_email, vat_number, billing_address, payment_terms, currency, retainer_amount )')
+    .select('id, name, status, website, industry, timezone, brand_colour, calendar_colour, client_internal ( account_owner_id, notes, billing_email, vat_number, billing_address, payment_terms, currency, retainer_amount )')
     .eq('id', id)
     .maybeSingle()
 
@@ -72,6 +72,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
     industry: client.industry,
     timezone: client.timezone,
     brand_colour: client.brand_colour,
+    calendar_colour: client.calendar_colour,
     account_owner_id: ci?.account_owner_id ?? null,
     notes: ci?.notes ?? null,
     billing_email: ci?.billing_email ?? null,

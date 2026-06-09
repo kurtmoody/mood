@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { fallbackColour } from '@/lib/colour'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -39,6 +40,7 @@ export async function createClientAction(
     p_industry: str('industry'),
     p_timezone: str('timezone') ?? 'Europe/Malta',
     p_brand_colour: str('brand_colour'),
+    p_calendar_colour: str('calendar_colour') ?? fallbackColour(name), // never null on new clients
     p_notes: str('notes'),
     p_billing_email: str('billing_email'),
     p_vat_number: str('vat_number'),

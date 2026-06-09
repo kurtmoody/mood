@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import ColourPicker from '@/components/ColourPicker'
 
 const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
 const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white'
@@ -10,6 +11,7 @@ export type ClientDefaults = {
   industry?: string | null
   timezone?: string | null
   brand_colour?: string | null
+  calendar_colour?: string | null
   account_owner_id?: string | null
   notes?: string | null
   billing_email?: string | null
@@ -66,6 +68,9 @@ export default function ClientFormFields({
           </Field>
           <Field label="Brand colour" name="brand_colour">
             <input id="brand_colour" name="brand_colour" defaultValue={d.brand_colour ?? ''} className={fieldCls} placeholder="#15171C" />
+          </Field>
+          <Field label="Calendar colour" name="calendar_colour">
+            <ColourPicker name="calendar_colour" defaultValue={d.calendar_colour} />
           </Field>
           <Field label="Timezone" name="timezone">
             <input id="timezone" name="timezone" defaultValue={d.timezone ?? 'Europe/Malta'} className={fieldCls} />

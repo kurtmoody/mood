@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getAccess } from '@/lib/access'
+import { clientColour, fallbackColour } from '@/lib/colour'
 import CalendarBoard from './CalendarBoard'
 import {
   addDays,
@@ -21,7 +22,7 @@ const CLIENT_VISIBLE_STATUSES = ['client_review', 'changes_requested', 'approved
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ client?: string; week?: string; month?: string; view?: string; post?: string }>
+  searchParams: Promise<{ client?: string; clients?: string; week?: string; month?: string; view?: string; post?: string }>
 }) {
   const supabase = await createClient()
   const access = await getAccess(supabase)
@@ -31,7 +32,7 @@ export default async function Home({
 
   // Clients the user can see (RLS scopes this already); for client users restrict
   // explicitly to their own client(s) — defence-in-depth, no agency-wide picker.
-  let clientsQuery = supabase.from('client').select('id, name').order('name')
+  let clientsQuery = supabase.from('client').select('id, name, calendar_colour').order('name')
   if (isClient) clientsQuery = clientsQuery.in('id', access.clientIds)
   const { data: clients } = await clientsQuery
   const clientList = clients ?? []
@@ -45,10 +46,17 @@ export default async function Home({
     )
   }
 
-  const { client: requested, week: weekParam, month: monthParam, view: viewParam, post: postParam } = await searchParams
+  const { client: requested, clients: clientsParam, week: weekParam, month: monthParam, view: viewParam, post: postParam } = await searchParams
 
-  // Selected client from ?client=, falling back to the first one.
-  const selected = clientList.find((c) => c.id === requested) ?? clientList[0]
+  // Combined view by default = ALL the user's visible clients. ?clients= (comma list)
+  // picks a subset; ?client= (single, used by deep-links) focuses one. Clients only
+  // ever see their own — visibleIds is already RLS-scoped above.
+  const visibleIds = clientList.map((c) => c.id)
+  const requestedSubset = clientsParam ? clientsParam.split(',').filter((id) => visibleIds.includes(id)) : []
+  const selectedClientIds =
+    requestedSubset.length > 0 ? requestedSubset
+    : requested && visibleIds.includes(requested) ? [requested]
+    : visibleIds
 
   const view: 'week' | 'month' = viewParam === 'month' ? 'month' : 'week'
   const todayStr = todayMalta()
@@ -77,8 +85,8 @@ export default async function Home({
   // status filter is defence-in-depth and helps the query planner.
   let itemsQuery = supabase
     .from('content_item')
-    .select('id, title, content_type, scheduled_at, status, current_version_id, channel_id, channel:channel_id ( type, label ), versions:content_version!content_version_content_item_id_fkey ( id, body, version_no, created_by, created_at, media ( id, storage_path, mime_type, created_at, sort_order ) ), events:approval_event ( id, version_id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id )')
-    .eq('client_id', selected.id)
+    .select('id, client_id, title, content_type, scheduled_at, status, current_version_id, channel_id, channel:channel_id ( type, label ), versions:content_version!content_version_content_item_id_fkey ( id, body, version_no, created_by, created_at, media ( id, storage_path, mime_type, created_at, sort_order ) ), events:approval_event ( id, version_id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id )')
+    .in('client_id', selectedClientIds)
     .gte('scheduled_at', weekStartUTC)
     .lt('scheduled_at', weekEndUTC)
   if (isClient) itemsQuery = itemsQuery.in('status', CLIENT_VISIBLE_STATUSES)
@@ -89,6 +97,8 @@ export default async function Home({
   const { data: team } = await supabase.from('team_member').select('full_name, user_id')
   const nameByUser = new Map<string, string>()
   for (const t of team ?? []) if (t.user_id) nameByUser.set(t.user_id, t.full_name)
+
+  const clientById = new Map(clientList.map((c) => [c.id, c]))
 
   const posts = (items ?? []).map((it: any) => {
     // Body is versioned — resolve the current version (or the latest).
@@ -143,7 +153,15 @@ export default async function Home({
       }))
     // The current version's media (same objects as in versionList, so signing fills both).
     const media = versionList.find((v: any) => v.isCurrent)?.media ?? []
-    return { ...it, body: current?.body ?? null, version_no: current?.version_no ?? 1, events, comments, media, versions: versionList }
+    const cli = clientById.get(it.client_id)
+    return {
+      ...it,
+      body: current?.body ?? null,
+      version_no: current?.version_no ?? 1,
+      events, comments, media, versions: versionList,
+      clientName: cli?.name ?? '',
+      clientColour: cli ? clientColour(cli) : fallbackColour(it.client_id),
+    }
   })
 
   // Sign ALL versions' media in ONE batched call (1-hour TTL) — not just the current
@@ -158,8 +176,9 @@ export default async function Home({
 
   return (
     <CalendarBoard
-      clients={clientList}
-      selectedClientId={selected.id}
+      clients={clientList.map((c) => ({ id: c.id, name: c.name, colour: clientColour(c) }))}
+      selectedClientIds={selectedClientIds}
+      defaultClientId={selectedClientIds[0] ?? visibleIds[0]}
       channelsByClient={channelsByClient}
       posts={posts}
       view={view}

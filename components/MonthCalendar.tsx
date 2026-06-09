@@ -2,6 +2,7 @@
 
 import { Image as ImageIcon } from 'lucide-react'
 import { maltaDate, mondayOf, monthOf } from '@/lib/week'
+import { textOn } from '@/lib/colour'
 import { STATUS, type Item } from './Calendar'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -76,16 +77,21 @@ export default function MonthCalendar({
                   {dayItems.slice(0, MAX_CHIPS).map((it) => {
                     const s = STATUS[it.status] ?? STATUS.draft
                     const label = it.title || it.channel?.label || it.channel?.type || it.content_type
+                    const colour = it.clientColour ?? '#FFFFFF'
+                    const fg = textOn(colour)
+                    const ring = fg === '#FFFFFF' ? 'rgba(255,255,255,.5)' : 'rgba(0,0,0,.12)'
                     return (
                       <button
                         key={it.id}
                         onClick={(e) => { e.stopPropagation(); onSelect(it) }}
-                        className="flex items-center gap-1.5 w-full text-left rounded-md px-1.5 py-1 text-[11px] hover:bg-[#F4F4F6] cursor-pointer"
+                        title={it.clientName ?? undefined}
+                        style={{ background: colour, color: fg }}
+                        className="flex items-center gap-1.5 w-full text-left rounded-md px-1.5 py-1 text-[11px] cursor-pointer"
                       >
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.dot }} />
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.dot, boxShadow: `0 0 0 1px ${ring}` }} />
                         <span className="truncate min-w-0">{label}</span>
                         {it.media && it.media.length > 0 && (
-                          <ImageIcon size={11} aria-label="Has media" className="shrink-0 ml-auto text-[#9398A1]" />
+                          <ImageIcon size={11} aria-label="Has media" className="shrink-0 ml-auto" style={{ opacity: 0.75 }} />
                         )}
                       </button>
                     )
