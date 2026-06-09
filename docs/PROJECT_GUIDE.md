@@ -159,7 +159,7 @@ Core tables are defined in `schema.sql`; later tables/columns are added by migra
 |---|---|---|
 | `agency` | The agency tenant | `id`, `name` |
 | `client` | A client of the agency | `id`, `agency_id`, `name`, `status` (prospect/active/paused/archived), `website`, `industry`, `current`… |
-| `membership` | user ↔ scope, with role | `user_id`, `scope_type` (`agency`/`client`), `scope_id`, `role` (`agency_admin`/`agency_member`/`client_approver`/…) |
+| `membership` | user ↔ scope, with role | `user_id`, `scope_type` (`agency`/`client`), `scope_id`, `role` — the Postgres **enum `public.member_role`** (`agency_admin`/`agency_member`/`client_approver`/`client_viewer`), so role values are DB-constrained (hence `set_member_role` casts `p_role::public.member_role`). |
 | `channel` | A publishing channel per client | `id`, `client_id`, `type` (instagram/facebook/linkedin/blog/newsletter), `label` |
 | `content_item` | A planned post | `id`, `client_id`, `channel_id`, `title`, `content_type`, `scheduled_at`, `status`, `current_version_id` (→ content_version, FK added 0021), `created_by`, `updated_at` |
 | `content_version` | Versioned body of a post | `id`, `content_item_id`, `version_no` (unique per item, `uq_version_no` 0021), `body`, `internal_note`, `created_by`, `created_at` |
@@ -511,6 +511,7 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 - **Storage:** private bucket; display via batched `createSignedUrls`; never `getPublicUrl`; `<img>` not `next/image`; upload path `<client_id>/<content_item_id>/<version_id>/<filename>`.
 - **Dates** are Europe/Malta, week starts Monday — use `lib/week.ts`; bucket posts by real date, never weekday.
 - **Migrations are manual + idempotent.** Apply schema changes to live **before** pushing app code that depends on them.
+- **Enum columns — cast text to the enum in RPCs.** `membership.role` is `public.member_role` and `content_item.status` is `content_status` (both enums). An INSERT of a string *literal* coerces automatically, but assigning a text *variable/param* does not — `set role = p_role` fails with a type mismatch. Validate the value, then cast: `set role = p_role::public.member_role` (see `set_member_role`).
 - **PostgREST embed ambiguity (PGRST201).** When **two FKs** connect the same pair of tables, an unqualified embed (`versions:content_version(...)`) becomes ambiguous and the whole query errors. This bit us when 0021 added `content_item.current_version_id → content_version` alongside the existing `content_version.content_item_id → content_item`: the calendar query now **must** name the FK — `versions:content_version!content_version_content_item_id_fkey(...)`. Single-FK embeds (e.g. `post_asset_link`, `task.client_id`, `task.owner_id`) need no hint. If you add an FK between two already-related tables, disambiguate their embeds.
 - **Fail loudly — don't swallow query errors.** Always destructure `{ data, error }` and surface/log it. The ambiguity bug above hid for a while because the calendar discarded `error` and rendered a silent empty grid. The calendar (and `/tasks`, `/dashboard`) now log the error and show a visible "Couldn't load… Please refresh." notice instead of an empty view.
 - **`tsconfig` excludes `supabase/`** so Next's `tsc` doesn't type-check the Deno Edge Function.

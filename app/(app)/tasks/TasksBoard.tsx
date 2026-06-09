@@ -127,7 +127,7 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
 
 type ModalState = { open: boolean; task: Task | null; seed?: Partial<TaskInput>; servesLabel: string | null }
 
-export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient, currentUserId, loadError, prefill, initialView, initialOwner, initialStatus }: {
+export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient, currentUserId, loadError, prefill, initialView, initialOwner, initialStatus, initialClient }: {
   tasks: Task[]
   teamMembers: Member[]
   clients: ClientOpt[]
@@ -138,11 +138,13 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
   initialView: View
   initialOwner: string
   initialStatus: string
+  initialClient: string
 }) {
   const router = useRouter()
   const [view, setViewState] = useState<View>(initialView)
   const [ownerFilter, setOwnerFilter] = useState<string>(initialOwner)
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus)
+  const [clientFilter, setClientFilter] = useState<string>(initialClient)
   const [sort, setSort] = useState<'due' | 'priority' | 'status' | 'title'>('due')
   const [modal, setModal] = useState<ModalState>(() =>
     prefill
@@ -157,13 +159,17 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
   const syncKey = tasks.map((t) => `${t.id}:${t.status}`).join('|')
   useEffect(() => { setLocalTasks(tasks) }, [syncKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // View choice in the URL (shareable/refresh-safe) without a server re-fetch.
-  function changeView(v: View) {
-    setViewState(v)
+  // View + filters mirrored to the URL (shareable/refresh-safe) without a server re-fetch.
+  // Two-way: seeded from ?view/?owner/?status/?client, and written back on any change.
+  useEffect(() => {
     const sp = new URLSearchParams(window.location.search)
-    sp.set('view', v)
-    window.history.replaceState(null, '', `?${sp.toString()}`)
-  }
+    sp.set('view', view)
+    ownerFilter ? sp.set('owner', ownerFilter) : sp.delete('owner')
+    statusFilter ? sp.set('status', statusFilter) : sp.delete('status')
+    clientFilter ? sp.set('client', clientFilter) : sp.delete('client')
+    const qs = sp.toString()
+    window.history.replaceState(null, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname)
+  }, [view, ownerFilter, statusFilter, clientFilter])
 
   const myMemberId = useMemo(() => teamMembers.find((m) => m.user_id === currentUserId)?.id ?? null, [teamMembers, currentUserId])
   const today = taskToday()
@@ -173,6 +179,8 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
       if (ownerFilter === 'me') { if (t.owner_id !== myMemberId) return false }
       else if (ownerFilter && t.owner_id !== ownerFilter) return false
       if (statusFilter && t.status !== statusFilter) return false
+      if (clientFilter === 'internal') { if (t.client_id !== null) return false }
+      else if (clientFilter && t.client_id !== clientFilter) return false
       return true
     })
     const cmp: Record<typeof sort, (a: Task, b: Task) => number> = {
@@ -182,7 +190,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
       title: (a, b) => a.title.localeCompare(b.title),
     }
     return [...filtered].sort(cmp[sort])
-  }, [localTasks, ownerFilter, statusFilter, sort, myMemberId])
+  }, [localTasks, ownerFilter, statusFilter, clientFilter, sort, myMemberId])
 
   async function run(id: string, p: Promise<{ error: string | null }>) {
     setBusyId(id); setActionError(null)
@@ -208,7 +216,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
           <h1 className="text-2xl font-bold">Tasks</h1>
           <div className="inline-flex rounded-lg border border-[#E2E2E5] overflow-hidden text-sm">
             {VIEWS.map((v) => (
-              <button key={v} onClick={() => changeView(v)} className={`px-3 py-1.5 cursor-pointer ${view === v ? 'bg-[#15171C] text-white font-semibold' : 'text-[#5A5E66] hover:bg-[#F4F4F6]'}`}>{cap(v)}</button>
+              <button key={v} onClick={() => setViewState(v)} className={`px-3 py-1.5 cursor-pointer ${view === v ? 'bg-[#15171C] text-white font-semibold' : 'text-[#5A5E66] hover:bg-[#F4F4F6]'}`}>{cap(v)}</button>
             ))}
           </div>
         </div>
@@ -224,6 +232,11 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-[#E2E2E5] px-3 py-2 text-sm text-[#5A5E66] cursor-pointer">
           <option value="">All statuses</option>
           {TASK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="rounded-lg border border-[#E2E2E5] px-3 py-2 text-sm text-[#5A5E66] cursor-pointer">
+          <option value="">All clients</option>
+          <option value="internal">Internal</option>
+          {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         {view === 'list' && (
           <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="rounded-lg border border-[#E2E2E5] px-3 py-2 text-sm text-[#5A5E66] cursor-pointer">

@@ -12,7 +12,7 @@ function postHref(p: { id: string; client_id: string | null; scheduled_at: strin
     : `/?client=${p.client_id}&post=${p.id}`
 }
 
-export default async function TasksPage({ searchParams }: { searchParams: Promise<{ forPost?: string; view?: string; owner?: string; status?: string }> }) {
+export default async function TasksPage({ searchParams }: { searchParams: Promise<{ forPost?: string; view?: string; owner?: string; status?: string; client?: string }> }) {
   const supabase = await createClient()
   const access = await getAccess(supabase)
   if (!access) redirect('/login')
@@ -52,7 +52,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
   // ?forPost=<content_item_id> → open the create modal pre-filled for that post.
   // ?view / ?owner / ?status seed the view + filters (shareable, dashboard deep-links).
-  const { forPost, view, owner, status } = await searchParams
+  const { forPost, view, owner, status, client } = await searchParams
   let prefill: { contentItemId: string; clientId: string | null; postTitle: string } | null = null
   if (forPost) {
     const { data: post } = await supabase.from('content_item').select('id, title, client_id').eq('id', forPost).maybeSingle()
@@ -72,6 +72,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       initialView={initialView}
       initialOwner={owner ?? ''}
       initialStatus={status ?? ''}
+      initialClient={client ?? ''}
     />
   )
 }

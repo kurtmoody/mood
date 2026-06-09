@@ -99,12 +99,13 @@ export default async function DashboardPage() {
   }
   const ownerRows = [...ownerMap.values()].sort((a, b) => b.count - a.count)
 
-  const clientMap = new Map<string, number>()
+  const clientMap = new Map<string, { id: string | null; name: string; count: number }>()
   for (const t of openTasks as any[]) {
-    const n = t.client?.name ?? 'Internal'
-    clientMap.set(n, (clientMap.get(n) ?? 0) + 1)
+    const k = t.client_id ?? 'internal'
+    const e = clientMap.get(k) ?? { id: t.client_id ?? null, name: t.client?.name ?? 'Internal', count: 0 }
+    e.count++; clientMap.set(k, e)
   }
-  const clientRows = [...clientMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
+  const clientRows = [...clientMap.values()].sort((a, b) => b.count - a.count)
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -156,10 +157,10 @@ export default async function DashboardPage() {
                 <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2.5">By client</div>
                 <div className="flex flex-col gap-1.5">
                   {clientRows.map((c) => (
-                    <div key={c.name} className="flex items-center justify-between gap-2 text-sm">
+                    <Link key={c.id ?? 'internal'} href={`/tasks?client=${c.id ?? 'internal'}`} className="flex items-center justify-between gap-2 text-sm hover:underline">
                       <span className="text-[#5A5E66] truncate">{c.name}</span>
                       <span className="text-[#15171C] font-medium">{c.count}</span>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </div>
