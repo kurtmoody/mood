@@ -1,7 +1,9 @@
 'use client'
 
 import { useActionState, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { STATUS, type Item } from './Calendar'
+import { STATUS_COLOUR as TASK_STATUS_COLOUR } from '@/lib/taskConstants'
 import MediaSection from './MediaSection'
 import AssetLinksSection from './AssetLinksSection'
 import VersionHistory from './VersionHistory'
@@ -330,6 +332,28 @@ export default function Drawer({
             isAgency={isAgency}
             contentItemId={item.id}
           />
+
+          {isAgency && (
+            <div className="mt-7 pt-5 border-t border-[#ECECEE]">
+              <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-3">Tasks</div>
+              {(item.tasks?.length ?? 0) === 0 ? (
+                <div className="text-sm text-[#9398A1]">No tasks for this post yet.</div>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {item.tasks!.map((t) => (
+                    <li key={t.id} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="truncate">{t.title}{t.ownerName && <span className="text-[#9398A1]"> · {t.ownerName}</span>}</span>
+                      <span className="inline-flex items-center gap-1.5 text-xs shrink-0 text-[#5A5E66]">
+                        <span className="w-2 h-2 rounded-full" style={{ background: TASK_STATUS_COLOUR[t.status] ?? '#A6ABB3' }} />
+                        {t.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <Link href={`/tasks?forPost=${item.id}`} className="inline-block mt-3 text-sm text-[#15171C] font-medium hover:underline">+ Add task for this post</Link>
+            </div>
+          )}
 
           {visibleActions.length > 0 && (
             <form ref={formRef} action={action} className="mt-7 pt-5 border-t border-[#ECECEE]">

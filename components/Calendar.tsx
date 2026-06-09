@@ -19,6 +19,13 @@ export type AssetLink = {
   sort_order: number
 }
 
+export type LinkedTask = {
+  id: string
+  title: string
+  status: string
+  ownerName: string | null
+}
+
 export type ApprovalEvent = {
   id: string
   action: string
@@ -65,6 +72,7 @@ export type Item = {
   clientColour?: string
   clientName?: string
   asset_links?: AssetLink[]
+  tasks?: LinkedTask[]
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']

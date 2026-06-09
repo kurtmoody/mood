@@ -85,7 +85,7 @@ export default async function Home({
   // status filter is defence-in-depth and helps the query planner.
   let itemsQuery = supabase
     .from('content_item')
-    .select('id, client_id, title, content_type, scheduled_at, status, current_version_id, channel_id, channel:channel_id ( type, label ), versions:content_version!content_version_content_item_id_fkey ( id, body, version_no, created_by, created_at, media ( id, storage_path, mime_type, created_at, sort_order ) ), events:approval_event ( id, version_id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id ), asset_links:post_asset_link ( id, label, url, sort_order )')
+    .select('id, client_id, title, content_type, scheduled_at, status, current_version_id, channel_id, channel:channel_id ( type, label ), versions:content_version!content_version_content_item_id_fkey ( id, body, version_no, created_by, created_at, media ( id, storage_path, mime_type, created_at, sort_order ) ), events:approval_event ( id, version_id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id ), asset_links:post_asset_link ( id, label, url, sort_order ), tasks:task ( id, title, status, owner:owner_id ( full_name ) )')
     .in('client_id', selectedClientIds)
     .gte('scheduled_at', weekStartUTC)
     .lt('scheduled_at', weekEndUTC)
@@ -162,6 +162,7 @@ export default async function Home({
       clientName: cli?.name ?? '',
       clientColour: cli ? clientColour(cli) : fallbackColour(it.client_id),
       asset_links: (it.asset_links ?? []).slice().sort((a: any, b: any) => a.sort_order - b.sort_order),
+      tasks: (it.tasks ?? []).map((t: any) => ({ id: t.id, title: t.title, status: t.status, ownerName: t.owner?.full_name ?? null })),
     }
   })
 

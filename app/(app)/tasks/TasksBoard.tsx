@@ -1,15 +1,18 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Check, Pencil, Trash2 } from 'lucide-react'
 import {
   TASK_TYPES, TASK_STATUSES, TASK_PRIORITIES, STATUS_COLOUR, PRIORITY_COLOUR,
 } from '@/lib/taskConstants'
 import { createTaskAction, updateTaskAction, deleteTaskAction, type TaskInput } from '../taskActions'
 
+type ServesPost = { title: string; href: string | null }
 type Task = {
   id: string
   client_id: string | null
+  content_item_id: string | null
   task_type: string | null
   title: string
   owner_id: string | null
@@ -21,9 +24,11 @@ type Task = {
   clientName: string | null
   clientColour: string | null
   ownerName: string | null
+  servesPost: ServesPost | null
 }
 type Member = { id: string; full_name: string; user_id: string | null }
 type ClientOpt = { id: string; name: string; colour: string }
+type Prefill = { contentItemId: string; clientId: string | null; postTitle: string }
 
 const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-2.5 py-1.5 text-sm bg-white'
 const PRIORITY_RANK: Record<string, number> = { Urgent: 0, High: 1, Medium: 2, Low: 3 }
@@ -31,7 +36,8 @@ const PRIORITY_RANK: Record<string, number> = { Urgent: 0, High: 1, Medium: 2, L
 function toInput(t: Task): TaskInput {
   return {
     client_id: t.client_id, task_type: t.task_type, title: t.title, owner_id: t.owner_id,
-    status: t.status, priority: t.priority, due_date: t.due_date, next_action: t.next_action, notes: t.notes,
+    status: t.status, priority: t.priority, due_date: t.due_date, next_action: t.next_action,
+    notes: t.notes, content_item_id: t.content_item_id,
   }
 }
 function fmtDate(d: string | null) {
@@ -48,21 +54,29 @@ function Pill({ value, colour }: { value: string; colour: string }) {
   )
 }
 
-// ---- Add/edit modal ----
-function TaskModal({ task, members, clients, onClose, onSaved }: {
+function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, onClose, onSaved }: {
   task: Task | null
+  seed?: Partial<TaskInput>
+  servesLabel: string | null
   members: Member[]
   clients: ClientOpt[]
+  leadPmByClient: Record<string, string | null>
   onClose: () => void
   onSaved: () => void
 }) {
   const [form, setForm] = useState<TaskInput>(task ? toInput(task) : {
     client_id: null, task_type: null, title: '', owner_id: null,
     status: 'Not Started', priority: 'Medium', due_date: null, next_action: null, notes: null,
+    content_item_id: null, ...seed,
   })
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const set = <K extends keyof TaskInput>(k: K, v: TaskInput[K]) => setForm((f) => ({ ...f, [k]: v }))
+
+  // Changing client re-suggests the owner from that client's Lead PM (a default, not a lock).
+  function onClientChange(clientId: string | null) {
+    setForm((f) => ({ ...f, client_id: clientId, owner_id: clientId ? leadPmByClient[clientId] ?? null : f.owner_id }))
+  }
 
   async function submit() {
     if (!form.title.trim()) { setError('Title is required.'); return }
@@ -77,15 +91,16 @@ function TaskModal({ task, members, clients, onClose, onSaved }: {
     <div className="fixed inset-0 z-50 grid place-items-center p-4">
       <div className="absolute inset-0 bg-black/20" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-white border border-[#ECECEE] rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-y-auto">
-        <div className="text-sm font-semibold mb-4">{task ? 'Edit task' : 'New task'}</div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="text-sm font-semibold mb-1">{task ? 'Edit task' : 'New task'}</div>
+        {servesLabel && <div className="text-xs text-[#9398A1] mb-3">Serves post: <span className="text-[#5A5E66]">{servesLabel}</span></div>}
+        <div className="grid grid-cols-2 gap-3 mt-3">
           <div className="col-span-2">
             <label className="block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Title *</label>
             <input value={form.title} onChange={(e) => set('title', e.target.value)} className={fieldCls} placeholder="What needs doing" />
           </div>
           <div>
             <label className="block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Client</label>
-            <select value={form.client_id ?? ''} onChange={(e) => set('client_id', e.target.value || null)} className={fieldCls}>
+            <select value={form.client_id ?? ''} onChange={(e) => onClientChange(e.target.value || null)} className={fieldCls}>
               <option value="">No client / internal</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -141,17 +156,28 @@ function TaskModal({ task, members, clients, onClose, onSaved }: {
   )
 }
 
-export default function TasksBoard({ tasks, teamMembers, clients, currentUserId, loadError }: {
+type ModalState = { open: boolean; task: Task | null; seed?: Partial<TaskInput>; servesLabel: string | null }
+
+export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient, currentUserId, loadError, prefill }: {
   tasks: Task[]
   teamMembers: Member[]
   clients: ClientOpt[]
+  leadPmByClient: Record<string, string | null>
   currentUserId: string
   loadError: boolean
+  prefill: Prefill | null
 }) {
-  const [ownerFilter, setOwnerFilter] = useState<string>('') // '' = all, 'me', or owner_id
+  const [ownerFilter, setOwnerFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [sort, setSort] = useState<'due' | 'priority' | 'status' | 'title'>('due')
-  const [modal, setModal] = useState<{ open: boolean; task: Task | null }>({ open: false, task: null })
+  const [modal, setModal] = useState<ModalState>(() =>
+    prefill
+      ? {
+          open: true, task: null, servesLabel: prefill.postTitle,
+          seed: { content_item_id: prefill.contentItemId, client_id: prefill.clientId, owner_id: prefill.clientId ? leadPmByClient[prefill.clientId] ?? null : null },
+        }
+      : { open: false, task: null, servesLabel: null },
+  )
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -185,7 +211,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, currentUserId,
     <div className="max-w-6xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <h1 className="text-2xl font-bold">Tasks</h1>
-        <button onClick={() => setModal({ open: true, task: null })} className="bg-[#15171C] text-white rounded-lg px-3.5 py-2 text-sm font-semibold cursor-pointer">New task</button>
+        <button onClick={() => setModal({ open: true, task: null, servesLabel: null })} className="bg-[#15171C] text-white rounded-lg px-3.5 py-2 text-sm font-semibold cursor-pointer">New task</button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -234,7 +260,14 @@ export default function TasksBoard({ tasks, teamMembers, clients, currentUserId,
               const overdue = t.due_date && t.due_date < today && t.status !== 'Complete'
               return (
                 <tr key={t.id} className="border-b border-[#ECECEE] last:border-b-0 hover:bg-[#FBFBFC]">
-                  <td className="px-4 py-2.5 font-medium">{t.title}</td>
+                  <td className="px-4 py-2.5">
+                    <div className="font-medium">{t.title}</div>
+                    {t.servesPost && (
+                      t.servesPost.href
+                        ? <Link href={t.servesPost.href} className="text-xs text-[#5A5E66] hover:underline">↗ {t.servesPost.title}</Link>
+                        : <span className="text-xs text-[#9398A1]">↗ {t.servesPost.title}</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5">
                     {t.clientName ? (
                       <span className="inline-flex items-center gap-1.5 text-[#5A5E66]"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: t.clientColour ?? '#A6ABB3' }} />{t.clientName}</span>
@@ -251,7 +284,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, currentUserId,
                       {t.status !== 'Complete' && (
                         <button onClick={() => run(t.id, updateTaskAction(t.id, { ...toInput(t), status: 'Complete' }))} disabled={busyId === t.id} aria-label="Mark complete" title="Mark complete" className="p-1 text-[#9398A1] hover:text-[#16A34A] cursor-pointer disabled:opacity-50"><Check size={15} /></button>
                       )}
-                      <button onClick={() => setModal({ open: true, task: t })} aria-label="Edit" className="p-1 text-[#9398A1] hover:text-[#15171C] cursor-pointer"><Pencil size={14} /></button>
+                      <button onClick={() => setModal({ open: true, task: t, servesLabel: t.servesPost?.title ?? null })} aria-label="Edit" className="p-1 text-[#9398A1] hover:text-[#15171C] cursor-pointer"><Pencil size={14} /></button>
                       <button onClick={() => { if (confirm('Delete this task?')) run(t.id, deleteTaskAction(t.id)) }} disabled={busyId === t.id} aria-label="Delete" className="p-1 text-[#9398A1] hover:text-[#E0572E] cursor-pointer disabled:opacity-50"><Trash2 size={14} /></button>
                     </div>
                   </td>
@@ -265,10 +298,13 @@ export default function TasksBoard({ tasks, teamMembers, clients, currentUserId,
       {modal.open && (
         <TaskModal
           task={modal.task}
+          seed={modal.seed}
+          servesLabel={modal.servesLabel}
           members={teamMembers}
           clients={clients}
-          onClose={() => setModal({ open: false, task: null })}
-          onSaved={() => setModal({ open: false, task: null })}
+          leadPmByClient={leadPmByClient}
+          onClose={() => setModal({ open: false, task: null, servesLabel: null })}
+          onSaved={() => setModal({ open: false, task: null, servesLabel: null })}
         />
       )}
     </div>
