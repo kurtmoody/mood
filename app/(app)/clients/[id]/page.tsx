@@ -43,9 +43,11 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
   const ciRaw = (client as { client_internal: Internal | Internal[] | null }).client_internal
   const ci = (Array.isArray(ciRaw) ? ciRaw[0] : ciRaw) ?? null
 
+  // Assignment dropdowns (account owner + ownership roles) — active members only.
   const { data: team } = await supabase
     .from('team_member')
     .select('id, full_name')
+    .eq('is_active', true)
     .order('full_name')
 
   const { data: channels } = await supabase

@@ -1,13 +1,15 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AddTeamMemberForm from './AddTeamMemberForm'
+import TeamList, { type Member } from './TeamList'
 
-type Member = {
+type Row = {
   id: string
   full_name: string
   role: string | null
   email: string | null
   is_active: boolean
+  user_id: string | null
 }
 
 export default async function TeamPage() {
@@ -23,10 +25,18 @@ export default async function TeamPage() {
 
   const { data: members } = await supabase
     .from('team_member')
-    .select('id, full_name, role, email, is_active')
+    .select('id, full_name, role, email, is_active, user_id')
     .order('created_at')
 
-  const rows = (members as Member[] | null) ?? []
+  const rows = (members as Row[] | null) ?? []
+  const list: Member[] = rows.map((m) => ({
+    id: m.id,
+    full_name: m.full_name,
+    role: m.role,
+    email: m.email,
+    is_active: m.is_active,
+    has_login: !!m.user_id,
+  }))
 
   return (
     <>
@@ -42,30 +52,7 @@ export default async function TeamPage() {
             <div className="text-sm text-[#5A5E66]">Add your agency&apos;s staff below.</div>
           </div>
         ) : (
-          <div className="border border-[#ECECEE] rounded-2xl bg-white overflow-hidden">
-            <div className="grid grid-cols-[1.4fr_1fr_1.4fr_auto] gap-4 px-5 py-2.5 border-b border-[#ECECEE] text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold">
-              <div>Name</div>
-              <div>Role</div>
-              <div>Email</div>
-              <div>Status</div>
-            </div>
-            {rows.map((m) => (
-              <div
-                key={m.id}
-                className="grid grid-cols-[1.4fr_1fr_1.4fr_auto] gap-4 px-5 py-3.5 border-b border-[#ECECEE] last:border-b-0 items-center"
-              >
-                <div className="text-sm font-semibold">{m.full_name}</div>
-                <div className="text-sm text-[#5A5E66]">{m.role ?? '—'}</div>
-                <div className="text-sm text-[#5A5E66]">{m.email ?? '—'}</div>
-                <div>
-                  <span className="inline-flex items-center gap-1.5 text-[11px] text-[#5A5E66] border border-[#ECECEE] rounded-full px-2 py-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: m.is_active ? '#16A34A' : '#A6ABB3' }} />
-                    {m.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+          <TeamList members={list} />
         )}
 
         <AddTeamMemberForm />
