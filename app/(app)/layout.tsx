@@ -8,5 +8,5 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const access = await getAccess(supabase)
   if (!access) redirect('/login')
 
-  return <AppShell email={access.email} isAgency={access.type === 'agency'}>{children}</AppShell>
+  return <AppShell email={access.email} isAgency={access.type === 'agency'} isAgencyAdmin={access.isAgencyAdmin}>{children}</AppShell>
 }

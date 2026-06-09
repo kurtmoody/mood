@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Calendar, LayoutDashboard, ListChecks, Users, Users2, Pin, type LucideIcon } from 'lucide-react'
+import { Calendar, LayoutDashboard, ListChecks, Users, Users2, Settings, Pin, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-type NavItem = { href: string; label: string; icon: LucideIcon; isActive: (path: string) => boolean; agencyOnly?: boolean }
+type NavItem = { href: string; label: string; icon: LucideIcon; isActive: (path: string) => boolean; agencyOnly?: boolean; adminOnly?: boolean }
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Calendar', icon: Calendar, isActive: (p) => p === '/' },
@@ -14,6 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/tasks', label: 'Tasks', icon: ListChecks, isActive: (p) => p === '/tasks' || p.startsWith('/tasks/'), agencyOnly: true },
   { href: '/clients', label: 'Clients', icon: Users, isActive: (p) => p === '/clients' || p.startsWith('/clients/'), agencyOnly: true },
   { href: '/team', label: 'Team', icon: Users2, isActive: (p) => p === '/team' || p.startsWith('/team/'), agencyOnly: true },
+  { href: '/admin', label: 'Admin', icon: Settings, isActive: (p) => p === '/admin' || p.startsWith('/admin/'), adminOnly: true },
 ]
 
 export default function Sidebar({
@@ -22,15 +23,21 @@ export default function Sidebar({
   pinned,
   onTogglePin,
   isAgency,
+  isAgencyAdmin,
 }: {
   open: boolean
   onClose: () => void
   pinned: boolean
   onTogglePin: () => void
   isAgency: boolean
+  isAgencyAdmin: boolean
 }) {
   const pathname = usePathname()
-  const navItems = NAV_ITEMS.filter((i) => isAgency || !i.agencyOnly)
+  const navItems = NAV_ITEMS.filter((i) => {
+    if (i.adminOnly && !isAgencyAdmin) return false
+    if (i.agencyOnly && !isAgency) return false
+    return true
+  })
   const [hovered, setHovered] = useState(false)
   const expanded = pinned || hovered // desktop: rail expands on hover when unpinned
 
