@@ -28,6 +28,7 @@ export default function CalendarBoard({
   currentUserId,
   isAgency,
   openPostId,
+  loadError,
 }: {
   clients: ClientOption[]
   selectedClientId: string
@@ -40,6 +41,7 @@ export default function CalendarBoard({
   currentUserId: string
   isAgency: boolean
   openPostId: string | null
+  loadError: boolean
 }) {
   const router = useRouter()
   const params = useSearchParams()
@@ -209,6 +211,12 @@ export default function CalendarBoard({
           </div>
         )}
       </div>
+
+      {loadError && (
+        <div className="mb-4 rounded-lg border border-[#E0572E]/30 bg-[#E0572E]/5 px-4 py-2.5 text-sm text-[#E0572E]">
+          ⚠️ Couldn&rsquo;t load posts. Please refresh.
+        </div>
+      )}
 
       {view === 'week' ? (
         <Calendar

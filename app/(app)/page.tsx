@@ -82,7 +82,8 @@ export default async function Home({
     .gte('scheduled_at', weekStartUTC)
     .lt('scheduled_at', weekEndUTC)
   if (isClient) itemsQuery = itemsQuery.in('status', CLIENT_VISIBLE_STATUSES)
-  const { data: items } = await itemsQuery.order('scheduled_at')
+  const { data: items, error } = await itemsQuery.order('scheduled_at')
+  if (error) console.error('content_item query failed:', error.message, error.code)
 
   // Resolve approval-event actors to team-member names.
   const { data: team } = await supabase.from('team_member').select('full_name, user_id')
@@ -168,6 +169,7 @@ export default async function Home({
       currentUserId={access.userId}
       isAgency={isAgency}
       openPostId={postParam ?? null}
+      loadError={!!error}
     />
   )
 }
