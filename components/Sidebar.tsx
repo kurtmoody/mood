@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Calendar, LayoutDashboard, Users, Users2, Pin, type LucideIcon } from 'lucide-react'
+import { Calendar, LayoutDashboard, ListChecks, Users, Users2, Pin, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type NavItem = { href: string; label: string; icon: LucideIcon; isActive: (path: string) => boolean; agencyOnly?: boolean }
@@ -11,6 +11,7 @@ type NavItem = { href: string; label: string; icon: LucideIcon; isActive: (path:
 const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Calendar', icon: Calendar, isActive: (p) => p === '/' },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, isActive: (p) => p === '/dashboard', agencyOnly: true },
+  { href: '/tasks', label: 'Tasks', icon: ListChecks, isActive: (p) => p === '/tasks' || p.startsWith('/tasks/'), agencyOnly: true },
   { href: '/clients', label: 'Clients', icon: Users, isActive: (p) => p === '/clients' || p.startsWith('/clients/'), agencyOnly: true },
   { href: '/team', label: 'Team', icon: Users2, isActive: (p) => p === '/team' || p.startsWith('/team/'), agencyOnly: true },
 ]

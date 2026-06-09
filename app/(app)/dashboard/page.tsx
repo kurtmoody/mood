@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getAccess } from '@/lib/access'
 import { mondayOf, maltaDate } from '@/lib/week'
+import { STATUS_COLOUR, OPEN_STATUSES } from '@/lib/taskConstants'
 
 // Statuses that need attention. Deliberately excludes draft (still being worked) and
 // approved/scheduled/posted (done).
@@ -78,6 +79,21 @@ export default async function DashboardPage() {
   const needsAction = rows.filter((r) => NEEDS_ACTION.includes(r.status)).sort(byOldest)
   const awaiting = rows.filter((r) => AWAITING.includes(r.status)).sort(byOldest)
 
+  // Tasks (internal): RLS scopes to the agency. Open = not Complete. Don't swallow errors.
+  const { data: taskData, error: taskErr } = await supabase
+    .from('task')
+    .select('id, title, status, priority, due_date, owner:owner_id ( full_name )')
+  if (taskErr) console.error('dashboard tasks query failed:', taskErr.message, taskErr.code)
+  const todayISO = new Date().toISOString().slice(0, 10)
+  const openTasks = (taskData ?? []).filter((t: any) => t.status !== 'Complete')
+  const taskStatusCounts = OPEN_STATUSES
+    .map((s) => ({ status: s as string, count: openTasks.filter((t: any) => t.status === s).length }))
+    .filter((c) => c.count > 0)
+  const urgentTasks = openTasks
+    .filter((t: any) => (t.due_date && t.due_date < todayISO) || t.priority === 'Urgent')
+    .sort((a: any, b: any) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999'))
+    .slice(0, 5)
+
   return (
     <div className="max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -85,6 +101,40 @@ export default async function DashboardPage() {
 
       <Section title="Needs your action" empty="Nothing needs your action." rows={needsAction} />
       <Section title="Awaiting client" empty="Nothing awaiting client." rows={awaiting} aging />
+
+      <section className="mb-10">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold">Tasks ({openTasks.length} open)</h2>
+          <Link href="/tasks" className="text-xs text-[#5A5E66] hover:underline">View all →</Link>
+        </div>
+        {openTasks.length === 0 ? (
+          <div className="text-sm text-[#9398A1] border border-dashed border-[#ECECEE] rounded-xl px-4 py-6 text-center">No open tasks.</div>
+        ) : (
+          <div className="border border-[#ECECEE] rounded-xl bg-white p-4">
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-3">
+              {taskStatusCounts.map((c) => (
+                <span key={c.status} className="inline-flex items-center gap-1.5 text-xs text-[#5A5E66]">
+                  <span className="w-2 h-2 rounded-full" style={{ background: STATUS_COLOUR[c.status] ?? '#A6ABB3' }} />
+                  {c.status} · {c.count}
+                </span>
+              ))}
+            </div>
+            {urgentTasks.length > 0 && (
+              <ul className="flex flex-col gap-1.5 border-t border-[#ECECEE] pt-3">
+                {urgentTasks.map((t: any) => {
+                  const overdue = t.due_date && t.due_date < todayISO
+                  return (
+                    <li key={t.id} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="truncate">{t.title}<span className="text-[#9398A1]"> · {t.owner?.full_name ?? 'Unassigned'}</span></span>
+                      <span className={`text-xs shrink-0 ${overdue ? 'text-[#E0572E] font-semibold' : 'text-[#9398A1]'}`}>{t.due_date ? fmtDate(t.due_date) : t.priority}</span>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   )
 }
