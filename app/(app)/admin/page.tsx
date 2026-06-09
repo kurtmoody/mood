@@ -1,8 +1,9 @@
 import Link from 'next/link'
 
-// Add future admin modules (task templates, permissions, …) by appending here.
+// Add future admin modules (task templates, …) by appending here.
 const SECTIONS = [
   { href: '/admin/raci', title: 'RACI matrix', desc: "Who's accountable for each task type." },
+  { href: '/admin/access', title: 'Team access', desc: 'Who can administer Mood.' },
 ]
 
 export default function AdminPage() {
