@@ -2,8 +2,10 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getAccess } from '@/lib/access'
-import { mondayOf, maltaDate } from '@/lib/week'
+import { mondayOf, maltaDate, todayMalta } from '@/lib/week'
 import { STATUS_COLOUR, OPEN_STATUSES } from '@/lib/taskConstants'
+import { computeCapacity, rangeWeeks } from '@/lib/capacity'
+import CapacityPlanner from '@/components/CapacityPlanner'
 
 // Statuses that need attention. Deliberately excludes draft (still being worked) and
 // approved/scheduled/posted (done).
@@ -36,7 +38,7 @@ type Row = {
   archived: boolean
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ archived?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ archived?: string; cap?: string }> }) {
   const supabase = await createClient()
   const access = await getAccess(supabase)
   if (!access) redirect('/login')
@@ -44,7 +46,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   // Archived clients' posts/tasks are hidden by default, consistent with the calendar +
   // task views; ?archived=1 includes them (marked). All counts derive from the filtered set.
-  const showArchived = (await searchParams).archived === '1'
+  const sp = await searchParams
+  const showArchived = sp.archived === '1'
+  // Capacity range: number of weeks from this week forward (preset). >8 weeks → month columns.
+  const CAP_PRESETS = [5, 8, 13, 26, 52]
+  const capWeeks = CAP_PRESETS.includes(Number(sp.cap)) ? Number(sp.cap) : 5
+  const capMode: 'week' | 'month' = capWeeks <= 8 ? 'week' : 'month'
 
   // No client filter: RLS scopes content_item to is_agency_for_client(...), so this
   // returns exactly the agency's clients' posts across ALL of them.
@@ -89,7 +96,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // Tasks (internal): RLS scopes to the agency. Open = not Complete. Don't swallow errors.
   const { data: taskData, error: taskErr } = await supabase
     .from('task')
-    .select('id, title, status, priority, due_date, owner_id, client_id, owner:owner_id ( full_name ), client:client_id ( name, status )')
+    .select('id, title, status, priority, due_date, start_date, estimated_hours, owner_id, client_id, owner:owner_id ( full_name ), client:client_id ( name, status )')
   if (taskErr) console.error('dashboard tasks query failed:', taskErr.message, taskErr.code)
   const todayISO = new Date().toISOString().slice(0, 10)
   // Internal tasks (client_id null) have no client to archive → always counted.
@@ -97,6 +104,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     (t: any) => t.status !== 'Complete' && (showArchived || t.client?.status !== 'archived'),
   )
   const overdueCount = openTasks.filter((t: any) => t.due_date && t.due_date < todayISO).length
+
+  // Capacity: spread each task's estimate across its weeks, per owner. Deliberately uses
+  // ALL tasks (archived clients included) — committed load is load — and excludes only
+  // Complete/On-Hold from hours (the helper handles status). Not affected by showArchived.
+  const capModel = computeCapacity(
+    (taskData ?? []).map((t: any) => ({
+      owner_id: t.owner_id, owner_name: t.owner?.full_name ?? null, status: t.status,
+      estimated_hours: t.estimated_hours, start_date: t.start_date, due_date: t.due_date,
+    })),
+    rangeWeeks(todayMalta(), capWeeks),
+    capMode,
+  )
+
   const taskStatusCounts = OPEN_STATUSES
     .map((s) => ({ status: s as string, count: openTasks.filter((t: any) => t.status === s).length }))
     .filter((c) => c.count > 0)
@@ -188,6 +208,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </div>
         )}
       </section>
+
+      <CapacityPlanner model={capModel} n={capWeeks} archived={showArchived} mode={capMode} />
     </div>
   )
 }
