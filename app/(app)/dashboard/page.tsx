@@ -33,23 +33,29 @@ type Row = {
   scheduled_at: string | null
   days: number
   href: string
+  archived: boolean
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ archived?: string }> }) {
   const supabase = await createClient()
   const access = await getAccess(supabase)
   if (!access) redirect('/login')
   if (access.type !== 'agency') redirect('/') // agency-only; clients have no dashboard
 
+  // Archived clients' posts/tasks are hidden by default, consistent with the calendar +
+  // task views; ?archived=1 includes them (marked). All counts derive from the filtered set.
+  const showArchived = (await searchParams).archived === '1'
+
   // No client filter: RLS scopes content_item to is_agency_for_client(...), so this
   // returns exactly the agency's clients' posts across ALL of them.
   const { data: items } = await supabase
     .from('content_item')
-    .select('id, title, content_type, status, scheduled_at, updated_at, client_id, client:client_id ( name ), channel:channel_id ( type, label ), events:approval_event ( action, created_at )')
+    .select('id, title, content_type, status, scheduled_at, updated_at, client_id, client:client_id ( name, status ), channel:channel_id ( type, label ), events:approval_event ( action, created_at )')
     .in('status', [...NEEDS_ACTION, ...AWAITING])
 
   const now = Date.now()
-  const rows: Row[] = (items ?? []).map((it: any) => {
+  const visibleItems = (items ?? []).filter((it: any) => showArchived || it.client?.status !== 'archived')
+  const rows: Row[] = visibleItems.map((it: any) => {
     // Entered-current-status time = latest approval_event (each transition logs one),
     // falling back to updated_at. Drives "how long it's been in this state".
     const latest = (it.events ?? []).reduce(
@@ -71,6 +77,7 @@ export default async function DashboardPage() {
       scheduled_at: it.scheduled_at,
       days,
       href,
+      archived: it.client?.status === 'archived',
     }
   })
 
@@ -82,10 +89,13 @@ export default async function DashboardPage() {
   // Tasks (internal): RLS scopes to the agency. Open = not Complete. Don't swallow errors.
   const { data: taskData, error: taskErr } = await supabase
     .from('task')
-    .select('id, title, status, priority, due_date, owner_id, client_id, owner:owner_id ( full_name ), client:client_id ( name )')
+    .select('id, title, status, priority, due_date, owner_id, client_id, owner:owner_id ( full_name ), client:client_id ( name, status )')
   if (taskErr) console.error('dashboard tasks query failed:', taskErr.message, taskErr.code)
   const todayISO = new Date().toISOString().slice(0, 10)
-  const openTasks = (taskData ?? []).filter((t: any) => t.status !== 'Complete')
+  // Internal tasks (client_id null) have no client to archive → always counted.
+  const openTasks = (taskData ?? []).filter(
+    (t: any) => t.status !== 'Complete' && (showArchived || t.client?.status !== 'archived'),
+  )
   const overdueCount = openTasks.filter((t: any) => t.due_date && t.due_date < todayISO).length
   const taskStatusCounts = OPEN_STATUSES
     .map((s) => ({ status: s as string, count: openTasks.filter((t: any) => t.status === s).length }))
@@ -109,8 +119,18 @@ export default async function DashboardPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
-      <p className="text-sm text-[#9398A1] mt-1 mb-8">What needs attention across all your clients.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-sm text-[#9398A1] mt-1 mb-8">What needs attention across all your clients.</p>
+        </div>
+        <Link
+          href={showArchived ? '/dashboard' : '/dashboard?archived=1'}
+          className={`shrink-0 rounded-lg border px-3 py-2 text-sm ${showArchived ? 'bg-[#15171C] text-white border-[#15171C] font-medium' : 'border-[#E2E2E5] text-[#5A5E66] hover:bg-[#F4F4F6]'}`}
+        >
+          Show archived
+        </Link>
+      </div>
 
       <Section title="Needs your action" empty="Nothing needs your action." rows={needsAction} />
       <Section title="Awaiting client" empty="Nothing awaiting client." rows={awaiting} aging />
@@ -187,13 +207,14 @@ function Section({ title, empty, rows, aging }: { title: string; empty: string; 
               <li key={r.id}>
                 <Link
                   href={r.href}
-                  className="flex items-center gap-3 border border-[#ECECEE] rounded-xl bg-white px-4 py-3 hover:shadow-md transition"
+                  className={`flex items-center gap-3 border border-[#ECECEE] rounded-xl bg-white px-4 py-3 hover:shadow-md transition ${r.archived ? 'opacity-60' : ''}`}
                 >
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: meta?.dot ?? '#A6ABB3' }} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
                       <span className="text-sm font-semibold truncate">{r.title}</span>
                       <span className="text-[12px] text-[#9398A1] shrink-0">{r.clientName}</span>
+                      {r.archived && <span className="text-[10px] uppercase tracking-wide font-semibold text-[#9398A1] border border-[#E2E2E5] rounded px-1.5 py-0.5 shrink-0">Archived</span>}
                     </div>
                     <div className="text-[12px] text-[#9398A1]">
                       <span className="capitalize">{r.channel}</span> · {meta?.label ?? r.status} · {fmtDate(r.scheduled_at)}

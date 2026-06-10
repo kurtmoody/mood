@@ -18,6 +18,7 @@ export type Task = {
   clientColour: string | null
   ownerName: string | null
   servesPost: ServesPost | null
+  archived: boolean
 }
 
 export type Member = { id: string; full_name: string; user_id: string | null }

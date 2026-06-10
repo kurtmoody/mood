@@ -71,6 +71,7 @@ export type Item = {
   versions?: VersionDetail[]
   clientColour?: string
   clientName?: string
+  archived?: boolean
   asset_links?: AssetLink[]
   tasks?: LinkedTask[]
 }
@@ -165,13 +166,16 @@ export default function Calendar({
                   onDragStart={dragEnabled ? (e) => { e.dataTransfer.setData('text/plain', it.id); e.dataTransfer.effectAllowed = 'move' } : undefined}
                   title={it.clientName ?? undefined}
                   style={{ background: colour, color: fg }}
-                  className={`text-left rounded-xl shadow-sm hover:shadow-md transition p-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#15171C]/15 ${dragEnabled ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                  className={`text-left rounded-xl shadow-sm hover:shadow-md transition p-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#15171C]/15 ${dragEnabled ? 'cursor-grab active:cursor-grabbing' : ''} ${it.archived ? 'opacity-50' : ''}`}
                 >
                   {it.media && it.media.length > 0 && <MediaThumb media={it.media} />}
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[12px] font-semibold capitalize">{it.channel?.type ?? it.content_type}</span>
                     <span className="text-[11px]" style={{ opacity: 0.75 }}>{time}</span>
                   </div>
+                  {it.archived && (
+                    <div className="inline-block text-[10px] uppercase tracking-wide font-semibold rounded px-1.5 py-0.5 mb-1.5" style={{ background: 'rgba(0,0,0,.12)' }}>Archived</div>
+                  )}
                   <div className="text-[12.5px] leading-snug mb-2">{it.title}</div>
                   <div className="flex items-center gap-1.5 text-[11px]" style={{ opacity: 0.9 }}>
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.dot, boxShadow: `0 0 0 1.5px ${ring}` }} />

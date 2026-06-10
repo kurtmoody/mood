@@ -32,7 +32,7 @@ export default async function Home({
 
   // Clients the user can see (RLS scopes this already); for client users restrict
   // explicitly to their own client(s) — defence-in-depth, no agency-wide picker.
-  let clientsQuery = supabase.from('client').select('id, name, calendar_colour').order('name')
+  let clientsQuery = supabase.from('client').select('id, name, calendar_colour, status').order('name')
   if (isClient) clientsQuery = clientsQuery.in('id', access.clientIds)
   const { data: clients } = await clientsQuery
   const clientList = clients ?? []
@@ -161,6 +161,8 @@ export default async function Home({
       events, comments, media, versions: versionList,
       clientName: cli?.name ?? '',
       clientColour: cli ? clientColour(cli) : fallbackColour(it.client_id),
+      // Archiving is an internal agency concept — never hide/mark posts for client users.
+      archived: isAgency && cli?.status === 'archived',
       asset_links: (it.asset_links ?? []).slice().sort((a: any, b: any) => a.sort_order - b.sort_order),
       tasks: (it.tasks ?? []).map((t: any) => ({ id: t.id, title: t.title, status: t.status, ownerName: t.owner?.full_name ?? null })),
     }
@@ -178,7 +180,7 @@ export default async function Home({
 
   return (
     <CalendarBoard
-      clients={clientList.map((c) => ({ id: c.id, name: c.name, colour: clientColour(c) }))}
+      clients={clientList.map((c) => ({ id: c.id, name: c.name, colour: clientColour(c), archived: isAgency && c.status === 'archived' }))}
       selectedClientIds={selectedClientIds}
       defaultClientId={selectedClientIds[0] ?? visibleIds[0]}
       channelsByClient={channelsByClient}

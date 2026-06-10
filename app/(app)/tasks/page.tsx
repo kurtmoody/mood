@@ -21,7 +21,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   // RLS scopes task to the agency; single-FK embeds (client/owner/content) are unambiguous.
   const { data: tasks, error } = await supabase
     .from('task')
-    .select('id, client_id, content_item_id, task_type, title, owner_id, status, priority, due_date, next_action, notes, client:client_id ( name, calendar_colour ), owner:owner_id ( full_name ), content:content_item_id ( id, title, client_id, scheduled_at )')
+    .select('id, client_id, content_item_id, task_type, title, owner_id, status, priority, due_date, next_action, notes, client:client_id ( name, calendar_colour, status ), owner:owner_id ( full_name ), content:content_item_id ( id, title, client_id, scheduled_at )')
     .order('created_at', { ascending: false })
   if (error) console.error('tasks query failed:', error.message, error.code)
 
@@ -55,6 +55,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     clientColour: t.client ? clientColour({ id: t.client_id, calendar_colour: t.client.calendar_colour }) : null,
     ownerName: t.owner?.full_name ?? null,
     servesPost: t.content ? { title: t.content.title ?? 'Untitled', href: postHref(t.content) } : null,
+    // Internal tasks (no client) are never archived — they have no client to archive.
+    archived: t.client?.status === 'archived',
   }))
 
   // ?forPost=<content_item_id> → open the create modal pre-filled for that post.

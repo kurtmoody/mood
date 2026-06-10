@@ -12,7 +12,7 @@ import { addCommentAction, deleteCommentAction } from './commentActions'
 import { updatePostAction, reschedulePostAction } from './postActions'
 import { addDays, addMonths, maltaDate, mondayOf, monthOf, monthGridDates, monthLabel, rescheduleToDateMalta, weekDates, weekRangeLabel } from '@/lib/week'
 
-type ClientOption = { id: string; name: string; colour: string }
+type ClientOption = { id: string; name: string; colour: string; archived: boolean }
 type Channel = { id: string; type: string; label: string | null }
 
 export default function CalendarBoard({
@@ -84,6 +84,11 @@ export default function CalendarBoard({
   const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set())
   const [channelFilter, setChannelFilter] = useState<Set<string>>(new Set())
   const [needsReview, setNeedsReview] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
+
+  const hasArchived = clients.some((c) => c.archived)
+  // Clients shown in the picker/legend track the toggle, so the picker matches the grid.
+  const visibleClients = showArchived ? clients : clients.filter((c) => !c.archived)
 
   // Keep the open drawer in sync after a transition refreshes the posts.
   useEffect(() => {
@@ -128,6 +133,7 @@ export default function CalendarBoard({
   const filtered = useMemo(() => {
     const review = isAgency ? ['internal_review', 'changes_requested'] : ['client_review']
     return localPosts.filter((p) => {
+      if (p.archived && !showArchived) return false
       if (needsReview) {
         if (!review.includes(p.status)) return false
       } else if (statusFilter.size > 0 && !statusFilter.has(p.status)) {
@@ -136,7 +142,7 @@ export default function CalendarBoard({
       if (channelFilter.size > 0 && !channelFilter.has(p.channel_id ?? '__none__')) return false
       return true
     })
-  }, [localPosts, needsReview, statusFilter, channelFilter, isAgency])
+  }, [localPosts, needsReview, statusFilter, channelFilter, isAgency, showArchived])
 
   const anyFilter = needsReview || statusFilter.size > 0 || channelFilter.size > 0
   const toggleIn = (set: Set<string>, v: string) => {
@@ -230,10 +236,10 @@ export default function CalendarBoard({
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        {clients.length > 1 && (
+        {visibleClients.length > 1 && (
           <FilterMenu
             label="Clients"
-            options={clients.map((c) => ({ value: c.id, label: c.name }))}
+            options={visibleClients.map((c) => ({ value: c.id, label: c.name }))}
             selected={new Set(selectedClientIds)}
             onToggle={toggleClient}
             onClear={() => setClients([])}
@@ -263,6 +269,16 @@ export default function CalendarBoard({
         >
           Needs my review
         </button>
+        {hasArchived && (
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className={`rounded-lg border px-3 py-2 text-sm cursor-pointer ${
+              showArchived ? 'bg-[#15171C] text-white border-[#15171C] font-medium' : 'border-[#E2E2E5] text-[#5A5E66] hover:bg-[#F4F4F6]'
+            }`}
+          >
+            Show archived
+          </button>
+        )}
         {anyFilter && (
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-xs text-[#9398A1]">Showing {filtered.length} of {localPosts.length}</span>
@@ -273,10 +289,10 @@ export default function CalendarBoard({
 
       {selectedClientIds.length > 1 && (
         <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[#5A5E66]">
-          {clients.filter((c) => selectedClientIds.includes(c.id)).map((c) => (
+          {visibleClients.filter((c) => selectedClientIds.includes(c.id)).map((c) => (
             <span key={c.id} className="inline-flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm" style={{ background: c.colour }} />
-              {c.name}
+              {c.name}{c.archived && <span className="text-[#9398A1]"> · archived</span>}
             </span>
           ))}
         </div>

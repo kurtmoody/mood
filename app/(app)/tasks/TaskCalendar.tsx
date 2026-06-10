@@ -51,9 +51,9 @@ export default function TaskCalendar({ tasks, onEdit }: { tasks: Task[]; onEdit:
                   {items.map((t) => {
                     const overdue = t.due_date! < today && t.status !== 'Complete'
                     return (
-                      <button key={t.id} onClick={() => onEdit(t)} className={`flex items-center gap-1.5 w-full text-left rounded-md px-1.5 py-1 text-[11px] cursor-pointer hover:bg-[#F4F4F6] ${overdue ? 'text-[#E0572E] font-medium' : ''}`}>
+                      <button key={t.id} onClick={() => onEdit(t)} className={`flex items-center gap-1.5 w-full text-left rounded-md px-1.5 py-1 text-[11px] cursor-pointer hover:bg-[#F4F4F6] ${overdue ? 'text-[#E0572E] font-medium' : ''} ${t.archived ? 'opacity-60' : ''}`}>
                         <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: t.clientColour ?? '#A6ABB3' }} />
-                        <span className="truncate min-w-0">{t.title}{t.ownerName && <span className="text-[#9398A1]"> · {t.ownerName}</span>}</span>
+                        <span className="truncate min-w-0">{t.title}{t.archived && <span className="text-[#9398A1]"> · archived</span>}{t.ownerName && <span className="text-[#9398A1]"> · {t.ownerName}</span>}</span>
                       </button>
                     )
                   })}
@@ -69,9 +69,9 @@ export default function TaskCalendar({ tasks, onEdit }: { tasks: Task[]; onEdit:
           <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2">No date ({noDate.length})</div>
           <div className="flex flex-wrap gap-2">
             {noDate.map((t) => (
-              <button key={t.id} onClick={() => onEdit(t)} className="inline-flex items-center gap-1.5 border border-[#ECECEE] rounded-lg px-2 py-1 text-[12px] hover:bg-[#F4F4F6] cursor-pointer">
+              <button key={t.id} onClick={() => onEdit(t)} className={`inline-flex items-center gap-1.5 border border-[#ECECEE] rounded-lg px-2 py-1 text-[12px] hover:bg-[#F4F4F6] cursor-pointer ${t.archived ? 'opacity-60' : ''}`}>
                 <span className="w-2 h-2 rounded-sm" style={{ background: t.clientColour ?? '#A6ABB3' }} />
-                <span className="truncate max-w-[160px]">{t.title}</span>
+                <span className="truncate max-w-[160px]">{t.title}{t.archived && <span className="text-[#9398A1]"> · archived</span>}</span>
               </button>
             ))}
           </div>

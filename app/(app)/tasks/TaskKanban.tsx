@@ -51,9 +51,12 @@ export default function TaskKanban({ tasks, onMove, onEdit }: {
                     onDragStart={() => setDraggingId(t.id)}
                     onDragEnd={() => { setDraggingId(null); setOverCol(null) }}
                     onClick={() => onEdit(t)}
-                    className={`text-left bg-white border border-[#ECECEE] rounded-lg p-2.5 shadow-sm hover:shadow-md cursor-pointer ${draggingId === t.id ? 'opacity-50' : ''}`}
+                    className={`text-left bg-white border border-[#ECECEE] rounded-lg p-2.5 shadow-sm hover:shadow-md cursor-pointer ${draggingId === t.id ? 'opacity-50' : ''} ${t.archived ? 'opacity-60' : ''}`}
                   >
-                    <div className="text-sm font-medium leading-snug mb-1.5">{t.title}</div>
+                    <div className="text-sm font-medium leading-snug mb-1.5">
+                      {t.title}
+                      {t.archived && <span className="ml-1.5 align-middle text-[9px] uppercase tracking-wide font-semibold text-[#9398A1] border border-[#E2E2E5] rounded px-1">Archived</span>}
+                    </div>
                     {t.servesPost && (
                       t.servesPost.href
                         ? <Link href={t.servesPost.href} draggable={false} onClick={(e) => e.stopPropagation()} className="block text-[11px] text-[#5A5E66] hover:underline mb-1.5">↗ {t.servesPost.title}</Link>

@@ -48,7 +48,10 @@ function taskCell(key: string, t: Task) {
     case 'title':
       return (
         <>
-          <div className="font-medium">{t.title}</div>
+          <div className="font-medium">
+            {t.title}
+            {t.archived && <span className="ml-2 align-middle text-[10px] uppercase tracking-wide font-semibold text-[#9398A1] border border-[#E2E2E5] rounded px-1.5 py-0.5">Archived</span>}
+          </div>
           {t.servesPost && (
             t.servesPost.href
               ? <Link href={t.servesPost.href} className="text-xs text-[#5A5E66] hover:underline">↗ {t.servesPost.title}</Link>
@@ -204,6 +207,8 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus)
   const [clientFilter, setClientFilter] = useState<string>(initialClient)
   const [sort, setSort] = useState<'due' | 'priority' | 'status' | 'title'>('due')
+  const [showArchived, setShowArchived] = useState(false)
+  const hasArchived = tasks.some((t) => t.archived)
   const [modal, setModal] = useState<ModalState>(() =>
     prefill
       ? { open: true, task: null, servesLabel: prefill.postTitle, seed: { content_item_id: prefill.contentItemId, client_id: prefill.clientId, owner_id: prefill.clientId ? leadPmByClient[prefill.clientId] ?? null : null } }
@@ -244,6 +249,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
 
   const visible = useMemo(() => {
     const filtered = localTasks.filter((t) => {
+      if (t.archived && !showArchived) return false
       if (ownerFilter === 'me') { if (t.owner_id !== myMemberId) return false }
       else if (ownerFilter && t.owner_id !== ownerFilter) return false
       if (statusFilter && t.status !== statusFilter) return false
@@ -258,7 +264,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
       title: (a, b) => a.title.localeCompare(b.title),
     }
     return [...filtered].sort(cmp[sort])
-  }, [localTasks, ownerFilter, statusFilter, clientFilter, sort, myMemberId])
+  }, [localTasks, ownerFilter, statusFilter, clientFilter, sort, myMemberId, showArchived])
 
   async function run(id: string, p: Promise<{ error: string | null }>) {
     setBusyId(id); setActionError(null)
@@ -314,6 +320,16 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
             <option value="title">Sort: Title</option>
           </select>
         )}
+        {hasArchived && (
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className={`rounded-lg border px-3 py-2 text-sm cursor-pointer ${
+              showArchived ? 'bg-[#15171C] text-white border-[#15171C] font-medium' : 'border-[#E2E2E5] text-[#5A5E66] hover:bg-[#F4F4F6]'
+            }`}
+          >
+            Show archived
+          </button>
+        )}
         <span className="text-xs text-[#9398A1] ml-auto">{visible.length} of {localTasks.length}</span>
         {view === 'list' && <ColumnPicker columns={columns} onChange={onColumnsChange} />}
       </div>
@@ -344,7 +360,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
               ) : visible.map((t) => {
                 const overdue = !!(t.due_date && t.due_date < today && t.status !== 'Complete')
                 return (
-                  <tr key={t.id} className="border-b border-[#ECECEE] last:border-b-0 hover:bg-[#FBFBFC]">
+                  <tr key={t.id} className={`border-b border-[#ECECEE] last:border-b-0 hover:bg-[#FBFBFC] ${t.archived ? 'opacity-60' : ''}`}>
                     {visibleColumns.map((c, i) => (
                       <td key={c.key} className={cellCls(c.key, i, overdue)}>{taskCell(c.key, t)}</td>
                     ))}

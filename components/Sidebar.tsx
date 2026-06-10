@@ -49,10 +49,16 @@ export default function Sidebar({
     let cancelled = false
     const supabase = createClient()
     ;(async () => {
-      const { count } = await supabase
+      // Exclude archived clients' posts so the badge reconciles with the dashboard's
+      // default (archived hidden).
+      const { data: archived } = await supabase.from('client').select('id').eq('status', 'archived')
+      const archivedIds = (archived ?? []).map((c) => c.id)
+      let q = supabase
         .from('content_item')
         .select('id', { count: 'exact', head: true })
         .in('status', ['internal_review', 'changes_requested'])
+      if (archivedIds.length) q = q.not('client_id', 'in', `(${archivedIds.join(',')})`)
+      const { count } = await q
       if (!cancelled) setActionCount(count ?? 0)
     })()
     return () => { cancelled = true }

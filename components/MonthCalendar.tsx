@@ -103,10 +103,11 @@ export default function MonthCalendar({
                         onDragStart={dragEnabled ? (e) => { e.dataTransfer.setData('text/plain', it.id); e.dataTransfer.effectAllowed = 'move' } : undefined}
                         title={it.clientName ?? undefined}
                         style={{ background: colour, color: fg }}
-                        className={`flex items-center gap-1.5 w-full text-left rounded-md px-1.5 py-1 text-[11px] cursor-pointer ${dragEnabled ? 'active:cursor-grabbing' : ''}`}
+                        className={`flex items-center gap-1.5 w-full text-left rounded-md px-1.5 py-1 text-[11px] cursor-pointer ${dragEnabled ? 'active:cursor-grabbing' : ''} ${it.archived ? 'opacity-50' : ''}`}
                       >
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.dot, boxShadow: `0 0 0 1px ${ring}` }} />
                         <span className="truncate min-w-0">{label}</span>
+                        {it.archived && <span className="shrink-0 text-[9px] uppercase tracking-wide font-semibold rounded px-1" style={{ background: 'rgba(0,0,0,.12)' }}>Arch</span>}
                         {((it.media && it.media.length > 0) || (it.asset_links && it.asset_links.length > 0)) && (
                           <span className="shrink-0 ml-auto flex items-center gap-0.5" style={{ opacity: 0.75 }}>
                             {it.media && it.media.length > 0 && <ImageIcon size={11} aria-label="Has media" />}
