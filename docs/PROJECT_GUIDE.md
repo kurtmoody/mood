@@ -1,6 +1,6 @@
 # Mood — Project Guide
 
-**Status:** Internal build, actively developed. Last updated 2026-06-10 (migration 0037).
+**Status:** Internal build, actively developed. Last updated 2026-06-10 (migration 0038).
 **Audience:** Engineers, product managers, and anyone picking this project up at any point.
 **Scope of this document:** A complete reference for what Mood is, how it's built, and how to operate it. It is the single source of truth for architecture, the data/security model, every shipped feature, the full RPC and migration ledger, conventions, and the operational runbook.
 
@@ -24,7 +24,7 @@
 12. [Notifications (bell + email)](#12-notifications)
 13. [Feature inventory](#13-feature-inventory)
 14. [RPC reference](#14-rpc-reference)
-15. [Migration ledger (0001–0037)](#15-migration-ledger)
+15. [Migration ledger (0001–0038)](#15-migration-ledger)
 16. [Conventions & hard-won gotchas](#16-conventions--hard-won-gotchas)
 17. [Testing (pgTap)](#17-testing-pgtap)
 18. [Operational runbook](#18-operational-runbook)
@@ -140,7 +140,8 @@ components/
 lib/
   supabase/{client,server,middleware}.ts             # Supabase SSR clients
   access.ts                                           # getAccess() → type/clientIds + agencyId + isAgencyAdmin
-  week.ts                                             # Europe/Malta date helpers (Monday-start)
+  week.ts                                             # Europe/Malta date helpers (Monday-start) +
+                                                      #   zonedDateTimeToUTC / maltaTimeOfDay / rescheduleToDateMalta
   media.ts                                            # mediaKind / mediaName helpers
   colour.ts                                           # CLIENT_PALETTE, clientColour(), textOn(), fallbackColour()
   taskConstants.ts                                    # TASK_TYPES / STATUSES / PRIORITIES + colours (single source)
@@ -383,6 +384,7 @@ A **view-agnostic** mechanism for hide/show/reorder of table columns, shipped on
 - **Combined all-clients view (default for agency).** The home calendar shows **every client's posts together** rather than one client (`clientList[0]`). The single-client dropdown is replaced by a **Clients multi-select** (reuse of `FilterMenu`), **URL-persisted via `?clients=`** (comma list); the query is `.in('client_id', selectedClientIds)`. A single-client deep-link (`?client=`) still focuses one. Clients only ever see their own.
 - **Per-client colour.** Each post card/chip is **filled with its client's `calendar_colour`** (text colour auto-chosen by luminance, `lib/colour.ts`), with the workflow **status as a dot**. A **colour→client legend** shows in combined view. Null-colour clients get a stable palette fallback at render.
 - **Create/edit posts** (`create_post`/`update_post`) — body versioned; status-aware editing (in-place vs fork).
+- **Drag-to-reschedule (0038)** — **agency-only**: drag a post card onto another day (week or month view) to move it. The shift is **date-only, Malta-correct** — the post keeps its Malta-local time-of-day (`rescheduleToDateMalta`), never a UTC shift. Optimistic with revert-on-error (kanban pattern). Dropping on a **past day** opens a confirm that always confirms the move and offers **"Mark as posted"** only for eligible posts (`approved`/`scheduled`); the RPC re-checks so a draft/review post can never jump to posted. Clients get **no drag** (the home calendar is shared; the affordance is gated on `isAgency`). Uses `reschedule_content_item`, a dedicated path that does **not** fork a version.
 - **Approval workflow** (`transition_post`) — the state machine, every move logged, history timeline in the drawer.
 - **Comments** (`add_comment`/`delete_comment`).
 - **Media** — upload, signed-URL display, drag-reorder, version-fork copy.
@@ -418,7 +420,7 @@ Data layer + emit (0019), enriched copy (0023), in-app bell, email Edge Function
 `/dashboard` (agency-only): a cross-client "needs attention" view aggregating `content_item` across **all** the agency's clients via RLS (no client filter). Sections — "Needs your action" (`internal_review`/`changes_requested`), "Awaiting client" (`client_review`, flagging items aged > 3 days), and a richer **task summary**: a prominent **overdue count** plus open-task breakdowns **By status** (→ `/tasks?status=`), **By owner** (→ `/tasks?owner=`), and **By client**. Each content row deep-links to the post. Read-only.
 
 ### Security (all pgTap-proven)
-Content read floor (0015), content tables RPC-only (0016), client transitions (0017), media table + storage policies (0018), notification RLS (0019), revoke (0020), versioning guards (0021), client version filter (0022), media reorder authorisation (0024), asset-link read floor + RPC auth (0026), task RLS + RPC auth (0028), client_ownership RLS + RPC auth (0030), RACI admin-write auth (0032), member-role admin-write + last-admin lockout (0033), team-member edit/deactivate auth (0034), invite create/accept auth incl. the client→agency leak guard (0035), permanent-delete auth + reassign/cascade + RACI merge (0036), view-preference own-rows RLS (0037).
+Content read floor (0015), content tables RPC-only (0016), client transitions (0017), media table + storage policies (0018), notification RLS (0019), revoke (0020), versioning guards (0021), client version filter (0022), media reorder authorisation (0024), asset-link read floor + RPC auth (0026), task RLS + RPC auth (0028), client_ownership RLS + RPC auth (0030), RACI admin-write auth (0032), member-role admin-write + last-admin lockout (0033), team-member edit/deactivate auth (0034), invite create/accept auth incl. the client→agency leak guard (0035), permanent-delete auth + reassign/cascade + RACI merge (0036), view-preference own-rows RLS (0037), reschedule auth + mark-posted state-machine guard (0038).
 
 ---
 
@@ -431,6 +433,7 @@ All RPCs are `SECURITY DEFINER` with `set search_path=''` and an `auth.uid()` nu
 |---|---|---|---|
 | `create_post` | `(client_id, channel_id?, title?, content_type?, scheduled_at?, body?) → uuid` | agency-for-client | Creates the item + v1, sets `current_version_id`. |
 | `update_post` | `(item_id, title, channel_id, scheduled_at, body) → jsonb` | agency-for-client | In-place for mutable statuses; **forks v2** for frozen statuses, returns `[{old_path,new_path}]` media pairs. |
+| `reschedule_content_item` | `(id, scheduled_at, mark_posted=false) → void` | agency-for-client (no client path) | Date-only move (drag-to-reschedule). **Never forks** — unlike `update_post`. `mark_posted` → `posted` **only** from `approved`/`scheduled`, else ignored. |
 | `transition_post` | `(item_id, action, note?) → text` | agency any; client only `approve`/`request_changes` from `client_review` | State machine, logs `approval_event`, emits notifications. |
 | `add_comment` | `(item_id, body) → uuid` | member of the client | Emits comment notifications. |
 | `delete_comment` | `(comment_id) → void` | author or agency | |
@@ -552,6 +555,7 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 | 0035 | invites (+test) | `invite` table (agency + client scopes, admin-read RLS, RPC-only) + `create_invite`/`revoke_invite`/`accept_pending_invites`. Magic-link-native; accept-on-login. |
 | 0036 | permanent_delete (+2 tests) | `delete_team_member` (reassign-then-delete) + `delete_client` (guarded cascade) — both admin-only + two-step. No table change. |
 | 0037 | view_preferences (+test) | `user_view_preference` table (own-rows-only RLS) + `set_view_preference` upsert RPC. Per-user column prefs. |
+| 0038 | reschedule_post (+test) | `reschedule_content_item` — agency-only date-only move (no version fork) + state-machine-guarded `mark_posted`. No table change. |
 
 > `schema.sql` is the fresh-setup reference **only** — it has a destructive reset block at the top; **never run it against the live DB.** New changes go in a migration.
 
@@ -567,7 +571,8 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 - **RLS is ON and is the read floor.** Rows are invisible without a `membership`.
 - **ALL content writes go through SECURITY DEFINER RPCs.** No permissive write policies on content tables (an inline RLS `WITH CHECK` subquery on `membership` silently fails). Authorisation is inside each RPC.
 - **Storage:** private bucket; display via batched `createSignedUrls`; never `getPublicUrl`; `<img>` not `next/image`; upload path `<client_id>/<content_item_id>/<version_id>/<filename>`.
-- **Dates** are Europe/Malta, week starts Monday — use `lib/week.ts`; bucket posts by real date, never weekday.
+- **Dates** are Europe/Malta, week starts Monday — use `lib/week.ts`; bucket posts by real date, never weekday. For a **date-only move** preserving time-of-day, use `rescheduleToDateMalta` (shifts by Malta wall-clock, not UTC) — never add/subtract on the UTC instant.
+- **Reschedule bypasses `update_post` on purpose (0038).** `update_post` **forks a new version and bounces frozen posts to `internal_review`** — correct for a body/title edit, catastrophic for a drag-to-reschedule (it would silently un-approve a post and spawn a spurious v2). Drag-to-reschedule therefore uses the dedicated `reschedule_content_item`, which only writes `scheduled_at` (+ optional `mark_posted`). Don't reroute it through `update_post`.
 - **Migrations are manual + idempotent.** Apply schema changes to live **before** pushing app code that depends on them.
 - **Enum columns — cast text to the enum in RPCs.** `membership.role` is `public.member_role` and `content_item.status` is `content_status` (both enums). An INSERT of a string *literal* coerces automatically, but assigning a text *variable/param* does not — `set role = p_role` fails with a type mismatch. Validate the value, then cast: `set role = p_role::public.member_role` (see `set_member_role`).
 - **PostgREST embed ambiguity (PGRST201).** When **two FKs** connect the same pair of tables, an unqualified embed (`versions:content_version(...)`) becomes ambiguous and the whole query errors. This bit us when 0021 added `content_item.current_version_id → content_version` alongside the existing `content_version.content_item_id → content_item`: the calendar query now **must** name the FK — `versions:content_version!content_version_content_item_id_fkey(...)`. Single-FK embeds (e.g. `post_asset_link`, `task.client_id`, `task.owner_id`) need no hint. If you add an FK between two already-related tables, disambiguate their embeds.
@@ -610,7 +615,7 @@ supabase functions deploy notify-email
 Then ensure a **Database Webhook** exists on `public.notification` (event INSERT) pointing at the function URL. Email needs the verified Resend domain (`mail.mood.mt`). The Edge change only takes effect after redeploy.
 
 ### Outstanding operational tasks (as of 2026-06-10)
-- Migrations through **0037** are applied (permission management, team edit/deactivate, invites, permanent delete, and per-user column prefs are live). Apply each new `migrations/NNNN_*.sql` in the SQL editor as it ships.
+- Migrations through **0038** are applied (permission management, team edit/deactivate, invites, permanent delete, per-user column prefs, and drag-to-reschedule are live). Apply each new `migrations/NNNN_*.sql` in the SQL editor as it ships.
 - Email delivery is **live**: `notify-email` deployed + Database Webhook `notify_email_on_insert` on `notification` INSERT, sending via Resend (`mail.mood.mt`). Runbook: `supabase/functions/notify-email/DEPLOY.md`. (Notification emails only — **invite emails are not auto-sent yet**, see §19.)
 
 ### Environment
@@ -638,7 +643,7 @@ Then ensure a **Database Webhook** exists on `public.notification` (event INSERT
 - Planned tables: `notification` (built) and `notification_preference` (future).
 
 ### Recently completed (this development cycle)
-Client Approve/Request-changes UI · snapshot-on-send versioning · agency + client version history · agency dashboard · calendar filters · month-view media indicator · enriched notification copy · persisted media ordering + drag-reorder · real portal revocation · **combined all-clients calendar** · **per-client `calendar_colour` + legend** · **labelled asset links (0026)** · **RACI reference data (0027)** · **internal task list + dashboard summary (0028)** · sidebar logo · **legacy `asset` table dropped (0029)** · **per-client ownership + matrix (0030)** · **content↔task bridge + Lead-PM owner suggestion (0031)** · **admin area + editable RACI matrix (0032)** · **task List/Kanban/Calendar views + deeper dashboard breakdowns** · **permission management: Admin → Team access, promote/demote with last-admin lockout (0033)** · **team member edit + soft-deactivate/reactivate (0034)** · **agency + client invites, magic-link-native, accept-on-login (0035)** · **permanent delete: reassign-then-delete team members, guarded-cascade clients (0036)** · **per-user column preferences on the task list (0037)**.
+Client Approve/Request-changes UI · snapshot-on-send versioning · agency + client version history · agency dashboard · calendar filters · month-view media indicator · enriched notification copy · persisted media ordering + drag-reorder · real portal revocation · **combined all-clients calendar** · **per-client `calendar_colour` + legend** · **labelled asset links (0026)** · **RACI reference data (0027)** · **internal task list + dashboard summary (0028)** · sidebar logo · **legacy `asset` table dropped (0029)** · **per-client ownership + matrix (0030)** · **content↔task bridge + Lead-PM owner suggestion (0031)** · **admin area + editable RACI matrix (0032)** · **task List/Kanban/Calendar views + deeper dashboard breakdowns** · **permission management: Admin → Team access, promote/demote with last-admin lockout (0033)** · **team member edit + soft-deactivate/reactivate (0034)** · **agency + client invites, magic-link-native, accept-on-login (0035)** · **permanent delete: reassign-then-delete team members, guarded-cascade clients (0036)** · **per-user column preferences on the task list (0037)** · **drag-to-reschedule posts on the calendar, agency-only, with a past-date confirm (0038)**.
 
 ---
 
@@ -668,4 +673,4 @@ Client Approve/Request-changes UI · snapshot-on-send versioning · agency + cli
 
 ---
 
-*This document reflects the codebase at migration 0037. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*
+*This document reflects the codebase at migration 0038. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*

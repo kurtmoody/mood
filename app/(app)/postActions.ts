@@ -35,6 +35,28 @@ export async function createPostAction(_prev: PostState, fd: FormData): Promise<
   return { error: null, ok: true }
 }
 
+// Drag-to-reschedule (agency-only, enforced in the RPC). Direct-call, like the kanban
+// drag — no form. Only moves the date (+ optional mark-posted); never forks a version.
+export async function reschedulePostAction(
+  itemId: string,
+  scheduledAtISO: string,
+  markPosted: boolean,
+): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not signed in.' }
+
+  const { error } = await supabase.rpc('reschedule_content_item', {
+    p_id: itemId,
+    p_scheduled_at: scheduledAtISO,
+    p_mark_posted: markPosted,
+  })
+  if (error) return { error: error.message }
+
+  revalidatePath('/')
+  return { error: null }
+}
+
 export async function updatePostAction(_prev: PostState, fd: FormData): Promise<PostState> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

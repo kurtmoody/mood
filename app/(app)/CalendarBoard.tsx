@@ -9,8 +9,8 @@ import Drawer from '@/components/Drawer'
 import NewPostForm from './NewPostForm'
 import { transitionPostAction } from './approvalActions'
 import { addCommentAction, deleteCommentAction } from './commentActions'
-import { updatePostAction } from './postActions'
-import { addDays, addMonths, mondayOf, monthOf, monthGridDates, monthLabel, weekDates, weekRangeLabel } from '@/lib/week'
+import { updatePostAction, reschedulePostAction } from './postActions'
+import { addDays, addMonths, maltaDate, mondayOf, monthOf, monthGridDates, monthLabel, rescheduleToDateMalta, weekDates, weekRangeLabel } from '@/lib/week'
 
 type ClientOption = { id: string; name: string; colour: string }
 type Channel = { id: string; type: string; label: string | null }
@@ -48,6 +48,36 @@ export default function CalendarBoard({
   const params = useSearchParams()
   const [selected, setSelected] = useState<Item | null>(null)
   const [formDate, setFormDate] = useState<string | null>(null)
+
+  // Local copy for optimistic drag-reschedule; re-syncs whenever server data changes.
+  const [localPosts, setLocalPosts] = useState(posts)
+  const syncKey = posts.map((p) => `${p.id}:${p.scheduled_at}:${p.status}`).join('|')
+  useEffect(() => { setLocalPosts(posts) }, [syncKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [actionError, setActionError] = useState<string | null>(null)
+  // Past-date drop awaiting confirmation (offers "mark posted" only for eligible posts).
+  const [confirmDrop, setConfirmDrop] = useState<{ item: Item; targetDate: string; eligible: boolean } | null>(null)
+
+  async function doReschedule(item: Item, targetDate: string, markPosted: boolean) {
+    if (!item.scheduled_at) return
+    const newISO = rescheduleToDateMalta(item.scheduled_at, targetDate).toISOString()
+    setActionError(null)
+    setLocalPosts((prev) => prev.map((p) =>
+      p.id === item.id ? { ...p, scheduled_at: newISO, status: markPosted ? 'posted' : p.status } : p,
+    ))
+    const r = await reschedulePostAction(item.id, newISO, markPosted)
+    if (r.error) { setActionError(r.error); router.refresh() } // revert to server truth
+  }
+
+  // Agency drag-drop onto a day. Same Malta day → no-op. Past day → confirm first.
+  function onReschedule(item: Item, targetDate: string) {
+    if (!item.scheduled_at || maltaDate(item.scheduled_at) === targetDate) return
+    if (targetDate < todayStr) {
+      setConfirmDrop({ item, targetDate, eligible: item.status === 'approved' || item.status === 'scheduled' })
+    } else {
+      doReschedule(item, targetDate, false)
+    }
+  }
 
   // Client-side filters over the already-loaded (RLS-scoped) posts — no refetch, no
   // query/URL change. State resets on navigation/refresh (not persisted), which is fine.
@@ -97,7 +127,7 @@ export default function CalendarBoard({
   // picker; channel filter ANDs in. Empty selections mean "all".
   const filtered = useMemo(() => {
     const review = isAgency ? ['internal_review', 'changes_requested'] : ['client_review']
-    return posts.filter((p) => {
+    return localPosts.filter((p) => {
       if (needsReview) {
         if (!review.includes(p.status)) return false
       } else if (statusFilter.size > 0 && !statusFilter.has(p.status)) {
@@ -106,7 +136,7 @@ export default function CalendarBoard({
       if (channelFilter.size > 0 && !channelFilter.has(p.channel_id ?? '__none__')) return false
       return true
     })
-  }, [posts, needsReview, statusFilter, channelFilter, isAgency])
+  }, [localPosts, needsReview, statusFilter, channelFilter, isAgency])
 
   const anyFilter = needsReview || statusFilter.size > 0 || channelFilter.size > 0
   const toggleIn = (set: Set<string>, v: string) => {
@@ -235,7 +265,7 @@ export default function CalendarBoard({
         </button>
         {anyFilter && (
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-xs text-[#9398A1]">Showing {filtered.length} of {posts.length}</span>
+            <span className="text-xs text-[#9398A1]">Showing {filtered.length} of {localPosts.length}</span>
             <button onClick={clearFilters} className="text-xs text-[#5A5E66] hover:underline cursor-pointer">Clear filters</button>
           </div>
         )}
@@ -257,6 +287,9 @@ export default function CalendarBoard({
           ⚠️ Couldn&rsquo;t load posts. Please refresh.
         </div>
       )}
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-[#E0572E]/30 bg-[#E0572E]/5 px-4 py-2.5 text-sm text-[#E0572E]">{actionError}</div>
+      )}
 
       {view === 'week' ? (
         <Calendar
@@ -265,6 +298,8 @@ export default function CalendarBoard({
           todayStr={todayStr}
           onSelect={setSelected}
           onNewPost={(d) => setFormDate(d)}
+          isAgency={isAgency}
+          onReschedule={isAgency ? onReschedule : undefined}
         />
       ) : (
         <MonthCalendar
@@ -275,6 +310,8 @@ export default function CalendarBoard({
           onSelect={setSelected}
           onNewPost={(d) => setFormDate(d)}
           onShowWeek={(m) => go({ view: 'week', week: m })}
+          isAgency={isAgency}
+          onReschedule={isAgency ? onReschedule : undefined}
         />
       )}
 
@@ -300,6 +337,58 @@ export default function CalendarBoard({
           onClose={() => setFormDate(null)}
         />
       )}
+
+      {confirmDrop && (
+        <RescheduleConfirm
+          targetDate={confirmDrop.targetDate}
+          eligible={confirmDrop.eligible}
+          onCancel={() => setConfirmDrop(null)}
+          onConfirm={(markPosted) => {
+            const { item, targetDate, eligible } = confirmDrop
+            setConfirmDrop(null)
+            doReschedule(item, targetDate, eligible && markPosted)
+          }}
+        />
+      )}
     </>
+  )
+}
+
+// Past-date drop confirmation. Always confirms the move; offers "mark as posted" only
+// when the post is eligible (approved/scheduled). Cancel → the post snaps back (nothing
+// was optimistically moved yet).
+function RescheduleConfirm({
+  targetDate,
+  eligible,
+  onConfirm,
+  onCancel,
+}: {
+  targetDate: string
+  eligible: boolean
+  onConfirm: (markPosted: boolean) => void
+  onCancel: () => void
+}) {
+  const [markPosted, setMarkPosted] = useState(false)
+  const nice = new Date(`${targetDate}T12:00:00Z`).toLocaleDateString('en-GB', {
+    weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  })
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center p-4">
+      <div className="absolute inset-0 bg-black/20" onClick={onCancel} />
+      <div className="relative w-full max-w-sm bg-white border border-[#ECECEE] rounded-2xl shadow-xl p-5">
+        <div className="text-sm font-semibold mb-1">Move to a past date?</div>
+        <p className="text-sm text-[#5A5E66] mb-4">You&rsquo;re moving this post to <span className="font-medium text-[#15171C]">{nice}</span>, which is in the past.</p>
+        {eligible && (
+          <label className="flex items-center gap-2 text-sm text-[#5A5E66] mb-4 cursor-pointer">
+            <input type="checkbox" checked={markPosted} onChange={(e) => setMarkPosted(e.target.checked)} className="cursor-pointer" />
+            Mark this post as posted
+          </label>
+        )}
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={onCancel} className="text-sm text-[#5A5E66] rounded-lg px-3 py-2 hover:bg-[#F4F4F6] cursor-pointer">Cancel</button>
+          <button onClick={() => onConfirm(markPosted)} className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer">Move</button>
+        </div>
+      </div>
+    </div>
   )
 }

@@ -42,9 +42,11 @@ export function weekDates(monday: string): string[] {
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
 }
 
-// UTC instant for the start of a Malta day — for range queries on timestamptz.
-export function zonedDayStartUTC(dateStr: string): Date {
-  const guess = new Date(`${dateStr}T00:00:00Z`)
+// UTC instant for a Malta wall-clock date+time (e.g. '2026-07-01', '09:30:00').
+// Finds Malta's offset at that instant via the standard guess-and-correct trick, so it
+// is DST-correct. timeStr defaults to midnight.
+export function zonedDateTimeToUTC(dateStr: string, timeStr = '00:00:00'): Date {
+  const guess = new Date(`${dateStr}T${timeStr}Z`)
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: TZ,
     hourCycle: 'h23',
@@ -61,6 +63,30 @@ export function zonedDayStartUTC(dateStr: string): Date {
   const asUTC = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second)
   const offset = asUTC - guess.getTime()
   return new Date(guess.getTime() - offset)
+}
+
+// UTC instant for the start of a Malta day — for range queries on timestamptz.
+export function zonedDayStartUTC(dateStr: string): Date {
+  return zonedDateTimeToUTC(dateStr, '00:00:00')
+}
+
+const timeFmt = new Intl.DateTimeFormat('en-GB', {
+  timeZone: TZ,
+  hourCycle: 'h23',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+})
+
+// 'HH:mm:ss' wall-clock time of an instant, in Malta.
+export function maltaTimeOfDay(instant: string | Date): string {
+  return timeFmt.format(new Date(instant))
+}
+
+// Move an instant to a different Malta calendar day while KEEPING its Malta-local
+// time-of-day; returns the new UTC instant. (Date-only shift — never shift in UTC.)
+export function rescheduleToDateMalta(instant: string | Date, targetDateStr: string): Date {
+  return zonedDateTimeToUTC(targetDateStr, maltaTimeOfDay(instant))
 }
 
 // Validate a 'YYYY-MM-DD' string.

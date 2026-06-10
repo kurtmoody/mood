@@ -92,13 +92,27 @@ export default function Calendar({
   todayStr,
   onSelect,
   onNewPost,
+  isAgency,
+  onReschedule,
 }: {
   items: Item[]
   weekDates: string[]
   todayStr?: string
   onSelect: (item: Item) => void
   onNewPost?: (prefill: string) => void
+  isAgency?: boolean
+  onReschedule?: (item: Item, targetDate: string) => void
 }) {
+  // Agency-only drag-to-reschedule. The dragged post id rides in dataTransfer; the day
+  // cell resolves it back to an Item and calls onReschedule.
+  const dragEnabled = !!isAgency && !!onReschedule
+  function onDrop(targetDate: string, e: React.DragEvent) {
+    if (!dragEnabled) return
+    e.preventDefault()
+    const id = e.dataTransfer.getData('text/plain')
+    const it = items.find((p) => p.id === id)
+    if (it) onReschedule!(it, targetDate)
+  }
   // Bucket posts by their actual Malta date; only this week's 7 dates render.
   const byDate = new Map<string, Item[]>()
   for (const it of items) {
@@ -131,6 +145,8 @@ export default function Calendar({
           <div
             key={i}
             onClick={() => onNewPost?.(weekDates[i] ? `${weekDates[i]}T09:00` : '')}
+            onDragOver={dragEnabled ? (e) => e.preventDefault() : undefined}
+            onDrop={dragEnabled && weekDates[i] ? (e) => onDrop(weekDates[i], e) : undefined}
             className={`min-h-[520px] border-r border-[#ECECEE] last:border-r-0 p-2 flex flex-col gap-2 cursor-pointer ${weekDates[i] === todayStr ? 'bg-[#F2F6FF]' : 'hover:bg-[#FBFBFC]/60'}`}
           >
             {dayItems.map((it) => {
@@ -145,9 +161,11 @@ export default function Calendar({
                 <button
                   key={it.id}
                   onClick={(e) => { e.stopPropagation(); onSelect(it) }}
+                  draggable={dragEnabled}
+                  onDragStart={dragEnabled ? (e) => { e.dataTransfer.setData('text/plain', it.id); e.dataTransfer.effectAllowed = 'move' } : undefined}
                   title={it.clientName ?? undefined}
                   style={{ background: colour, color: fg }}
-                  className="text-left rounded-xl shadow-sm hover:shadow-md transition p-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#15171C]/15"
+                  className={`text-left rounded-xl shadow-sm hover:shadow-md transition p-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#15171C]/15 ${dragEnabled ? 'cursor-grab active:cursor-grabbing' : ''}`}
                 >
                   {it.media && it.media.length > 0 && <MediaThumb media={it.media} />}
                   <div className="flex items-center justify-between mb-1.5">
