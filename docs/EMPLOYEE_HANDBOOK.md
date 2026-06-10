@@ -20,7 +20,7 @@
 9. [The approval workflow — the heart of Mood](#9-the-approval-workflow)
 10. [Versions — what happens when you edit an approved post](#10-versions)
 11. [Media and attachments](#11-media-and-attachments)
-12. [Comments](#12-comments)
+12. [Comments and internal notes](#12-comments-and-internal-notes)
 13. [The client portal — how clients experience Mood](#13-the-client-portal)
 14. [Clients (the CRM)](#14-clients-the-crm)
 15. [Per-client ownership & the RACI matrix](#15-ownership-and-raci)
@@ -82,9 +82,13 @@ Within the agency team there are two permission levels:
 | **Media** | Images, videos or PDFs attached to a post. |
 | **Asset link** | A labelled link on a post (e.g. "Drive folder", "Raw footage", "Final exports"). |
 | **Task** | An internal to-do item for the team (clients never see tasks). |
+| **Internal note** | A private team note on a post or a task. **Clients never see internal notes** — they're separate from the client-facing comments. |
 | **RACI** | A grid of who's Responsible / Accountable / Supporting / Consulted / Informed for each type of work. |
 | **Ownership** | Who on the team owns which role for a specific client (Lead PM, Creative Lead, etc.). |
 | **Dashboard** | A one-glance summary of what needs attention across all clients. |
+| **Archive** | Marking a client as no longer active. Their posts and tasks are then hidden from the team's working views by default (with a "Show archived" toggle to bring them back). Reversible — you can reactivate any time. **Does not affect what the client sees** in their own portal. |
+| **Invite** | An email-based way to give a teammate or a client contact access. They sign in with the normal magic link and access is granted automatically. |
+| **Export** | A downloadable backup (a ZIP of spreadsheets) of everything attached to a client — taken before permanently deleting them. |
 
 ---
 
@@ -124,9 +128,11 @@ The calendar is the home screen for the agency. It shows planned posts on real d
 - **Colours.** Each client has a **calendar colour**. Every post is filled with its client's colour, with a small **status dot** showing where it is in the workflow. In the combined view there's a **colour → client legend** so you know whose is whose.
 - **Filter by client.** Use the Clients filter to narrow to one or several clients. Your selection is saved in the page address, so you can bookmark or share a filtered view.
 - **Open a post.** Click any post to open its detail panel (the "drawer") on the right, where everything about that post lives.
+- **Drag to reschedule.** Agency users can **drag a post onto another day** (week or month view) to change its planned date — it keeps its time of day. If you drop it on a date in the past, Mood asks you to confirm, and (for approved/scheduled posts only) offers to mark it as posted. Clients can't drag.
 - **Other filters.** You can filter by status, by channel, and there's a "Needs my review" toggle that shows just the posts waiting on you.
+- **Archived clients.** Posts belonging to **archived** clients are hidden by default. A **"Show archived"** toggle brings them back (shown greyed out with an "Archived" tag). This is agency-only housekeeping — see §14.
 
-Clients see the same calendar idea, but only their own posts, and only from the point a post is sent to them onward.
+Clients see the same calendar idea, but only their own posts, and only from the point a post is sent to them onward. (Archiving a client never changes what that client sees in their own portal.)
 
 ---
 
@@ -197,9 +203,14 @@ Why: so that what a client saw and approved is preserved exactly. If you need to
 
 ---
 
-## 12. Comments
+## 12. Comments and internal notes
 
-Each post has a comments thread. The agency and the client (once the post is visible to them) can both comment. Comments trigger notifications to the other side (see §18). You can delete your own comments (and the agency can moderate).
+There are **two** separate places to write on a post — don't mix them up:
+
+- **Comments** — the **client-facing** thread. The agency and the client (once the post is visible to them) can both comment. Comments trigger notifications to the other side (see §18). You can delete your own comments (and the agency can moderate).
+- **Internal notes** — a **private team-only** section on the post, clearly labelled "Internal notes — not visible to the client". Use this for anything you don't want the client to read. Only agency users see it; you can edit or delete your **own** notes. Tasks have the same internal-notes section (see §16).
+
+Rule of thumb: if it's for the client, it's a **comment**; if it's for the team, it's an **internal note**.
 
 ---
 
@@ -212,9 +223,13 @@ This is how a client experiences Mood. It's deliberately tiny and friction-free.
 - **They can:** approve a post, request changes (with a note), comment, and view the media and asset links on posts that are visible to them.
 - **They cannot:** create or edit posts, change statuses beyond approve/request-changes, see internal anything, or reach agency-only pages.
 
-**Giving a client access:** on a client's contact record there's a "portal access" toggle. Turning it on invites that contact; when they log in, they're connected automatically.
+**Giving a client access:** two ways, both by email — the person just signs in with the normal magic link and access is granted automatically:
+- The **portal access** toggle on a client's contact record (turn it on for that contact), or
+- An **invite** on the client's page ("Invite to portal", choose Approver or Viewer). Pending invites are listed with a Revoke option.
 
-**Removing access:** turning the toggle off **immediately** removes their access — even if they're already logged in. It only affects that one client (it won't touch any other access they have).
+**Removing access:** turning the portal-access toggle off **immediately** removes their access — even if they're already logged in. It only affects that one client (it won't touch any other access they have).
+
+**Archived clients:** if a client is archived (§14), it makes **no difference to what that client sees** — their portal works exactly as before. Archiving only tidies *our* internal working views.
 
 ---
 
@@ -229,8 +244,25 @@ The **Clients** area is where we keep everything about a client.
 - **Brand assets:** logos, colours, fonts, guidelines, and other brand references.
 - **Channels:** the client's Instagram / Facebook / LinkedIn / blog / newsletter etc.
 - **Ownership:** who on our team owns which role for this client (see §15).
+- **Invites:** invite a client contact to the portal by email (see §13).
 
 > **Brand colour vs calendar colour:** these are two different things. **Brand colour** is the client's actual brand identity colour. **Calendar colour** is just the tag colour their posts get on the calendar — chosen for visual clarity, and it can differ from their brand.
+
+### Archiving, reactivating, and deleting a client
+
+From the **Clients list**, each row has an actions menu:
+
+- **Archive** (any team member): tidies a client away when the engagement is dormant. Their posts and tasks drop out of the team's working views (calendar, tasks, dashboard) by default — but nothing is deleted, and the **client's own portal is unaffected**. There's a quick confirm.
+- **Reactivate** (any team member): brings an archived client back; everything reappears automatically.
+- **Delete permanently** (**admins only**, and only on **archived** clients): this is the irreversible one. It opens a two-step dialog:
+  1. **Export client data** — download a ZIP backup (spreadsheets of the client, contacts, posts, comments, internal notes and tasks). Do this first; it's your only chance.
+  2. **Confirm by typing the client's name**, then delete. This wipes the client and *all* their content, comments, notes and tasks for good.
+
+You must **archive before you can delete** — there's no one-click delete of an active client.
+
+### Managing the team
+
+The **Team** page is the agency staff directory. You can add a member, **edit** their name/role/email, and **deactivate** (and later reactivate) them — deactivated members drop out of assignment dropdowns (task owner, ownership, RACI) but keep any login. There's an **Active / All** view so deactivated people aren't lost. Admins can also **permanently delete** a member, which first asks you to pick a **successor** to inherit their tasks, ownership and RACI.
 
 ---
 
@@ -260,9 +292,13 @@ Each task has: a title, an optional client (or "Internal" for non-client work), 
 - **Priorities:** Low, Medium, High, Urgent.
 
 **Three ways to look at the same tasks** (a switcher at the top of the Tasks page; your choice is saved in the address bar so it's shareable):
-- **List** — a sortable table. Filter by owner (including "My tasks"), status, and client.
+- **List** — a sortable table. Filter by owner (including "My tasks"), status, and client. You can **customise the columns** — a "Columns" button lets you show/hide and drag to reorder them; your choice is remembered for you (the Task column always stays).
 - **Kanban** — columns by status; **drag a card to another column** to change its status.
 - **Calendar** — tasks plotted by due date on a month grid, with a "No date" tray for tasks without a due date. Overdue tasks are highlighted.
+
+**Internal notes on a task:** open a task to add private team notes (the same internal-notes feature as on posts — see §12). Clients never see tasks or their notes.
+
+**Archived clients:** tasks belonging to archived clients are hidden by default, with a "Show archived" toggle (same as the calendar). Internal tasks (no client) are never affected.
 
 **Linking a task to a post:** a task can "serve" a specific post. From a post's detail panel you can **"Add task for this post"** (it pre-fills the client and links the task to that post). On the task side, you'll see which post it serves, with a link back to it. This connects the planning (calendar) and the doing (tasks).
 
@@ -278,7 +314,7 @@ The **Dashboard** (agency-only) is a one-glance "what needs attention across all
 - **Awaiting client** — posts in client review, flagging any that have been waiting more than a few days.
 - **Tasks summary** — a prominent **overdue** count, plus open tasks broken down **by status**, **by owner**, and **by client**. Each breakdown links straight into a pre-filtered Tasks page.
 
-It's read-only — it's there to tell you where to look, then you click through.
+It's read-only — it's there to tell you where to look, then you click through. Archived clients' posts and tasks are left out of these counts by default (there's a **"Show archived"** toggle), so the numbers match what you see on the calendar and Tasks views.
 
 ---
 
@@ -301,7 +337,7 @@ Mood notifies the right people at the moments that matter (it's deliberately qui
 Only **admins** see the **Admin** item in the sidebar. It's for agency-level settings:
 
 - **RACI matrix** — edit the responsibility grid (who's A/R/S/C/I for each task type). It's a grid of dropdowns; set them and save.
-- **Team access** — promote or demote team members between **Admin** and **Member**. There's a safety rule: **you can't remove the last admin** — at least one admin must always exist (the control is disabled for the final admin).
+- **Team access** — promote or demote team members between **Admin** and **Member**. There's a safety rule: **you can't remove the last admin** — at least one admin must always exist (the control is disabled for the final admin). This page also has the **invite a teammate** panel (invite an agency member by email; pending invites listed with Revoke).
 
 If you need to be made an admin, ask one of the current admins (Michelle or Sandrina).
 
@@ -340,6 +376,20 @@ No. Editing a post that the client had already seen forks a new version and boun
 **Q: What's the difference between brand colour and calendar colour?**
 Brand colour = the client's real brand identity colour. Calendar colour = the tag colour their posts get on the calendar. They're separate on purpose.
 
+**Q: Can I move a post to a different day?**
+Yes — drag it onto another day in the week or month view (agency only). It keeps its time. Dropping it on a past date asks you to confirm.
+
+**Q: A client's posts vanished from my calendar / dashboard.**
+The client was probably **archived**. Their posts and tasks are hidden by default from our working views — flip **"Show archived"** to see them (greyed, tagged "Archived"), or reactivate the client. The client's own portal is unaffected either way.
+
+**Internal notes**
+
+**Q: What's the difference between a comment and an internal note?**
+A **comment** is client-facing (the client can see and reply). An **internal note** is team-only and clearly labelled "not visible to the client". Both live on the post; tasks also have internal notes. If it's for the client, comment; if it's for the team, internal note.
+
+**Q: Can the client see internal notes?**
+No — never. They're agency-only.
+
 **Approval workflow**
 
 **Q: What does "Changes requested" mean?**
@@ -357,10 +407,27 @@ The client approval is theirs to give from their portal. If you need to record s
 **Clients & access**
 
 **Q: How do I give a client access to the portal?**
-On the client's contact record, turn on **portal access** for that contact. They'll be able to log in with their email, and they're connected automatically on first login.
+Either turn on **portal access** on the contact record, or use **Invite to portal** on the client's page (Approver or Viewer). Either way they log in with their email and are connected automatically on first login.
 
 **Q: I turned off a client's access — when does it take effect?**
 Immediately, even if they're currently logged in. It only affects that one client.
+
+**Q: How do I archive a client, and what happens?**
+From the Clients list, use the row's actions menu → **Archive**. Their posts and tasks drop out of our calendar/tasks/dashboard by default; nothing is deleted and their portal is unaffected. **Reactivate** any time to bring it all back.
+
+**Q: How do I permanently delete a client?**
+First archive it. Then (admins only) open the archived client's delete dialog: **export the data** (a ZIP backup), then **type the client's name** to confirm. This is irreversible and removes all their posts, comments, notes and tasks.
+
+**Q: What's in the client export?**
+A ZIP of spreadsheets (CSVs): the client, contacts, posts, comments, internal notes, and tasks — everything you're allowed to see. It's meant as a backup to take before deleting.
+
+**Team**
+
+**Q: Someone left the team — what do I do?**
+**Deactivate** them on the Team page (they drop out of assignment lists but keep their login). Use the **Active / All** toggle to find deactivated people. Admins can **permanently delete** a member, which asks you to choose a **successor** to inherit their tasks, ownership and RACI first.
+
+**Q: How do I customise the Tasks columns?**
+On the Tasks **List** view, click **Columns** to show/hide and drag to reorder. Your layout is saved for you. (The Task title column always stays.)
 
 **Q: A client says they logged in but see nothing.**
 They'll only see posts that are in "client review" or later. If everything for them is still internal, there's nothing for them to see yet. Also confirm their contact has portal access and their login email matches the contact email.
