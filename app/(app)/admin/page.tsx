@@ -4,6 +4,7 @@ import Link from 'next/link'
 const SECTIONS = [
   { href: '/admin/raci', title: 'RACI matrix', desc: "Who's accountable for each task type." },
   { href: '/admin/access', title: 'Team access', desc: 'Who can administer Mood.' },
+  { href: '/admin/costs', title: 'Cost per hour', desc: 'Blended internal rate for profitability.' },
 ]
 
 export default function AdminPage() {
