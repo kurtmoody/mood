@@ -29,6 +29,13 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const { data: clients } = await supabase.from('client').select('id, name, calendar_colour').order('name')
   const { data: ownership } = await supabase.from('client_ownership').select('client_id, lead_pm_id')
 
+  // This user's column preference for the task list (own-row read under RLS).
+  const { data: viewPref } = await supabase
+    .from('user_view_preference')
+    .select('config')
+    .eq('view_key', 'tasks')
+    .maybeSingle()
+
   const leadPmByClient: Record<string, string | null> = {}
   for (const o of ownership ?? []) leadPmByClient[(o as any).client_id] = (o as any).lead_pm_id
 
@@ -73,6 +80,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       initialOwner={owner ?? ''}
       initialStatus={status ?? ''}
       initialClient={client ?? ''}
+      savedColumns={(viewPref?.config as { key: string; hidden: boolean }[] | null) ?? null}
     />
   )
 }

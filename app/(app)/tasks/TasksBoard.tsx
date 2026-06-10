@@ -6,7 +6,11 @@ import { useRouter } from 'next/navigation'
 import { Check, Pencil, Trash2 } from 'lucide-react'
 import { TASK_TYPES, TASK_STATUSES, TASK_PRIORITIES, STATUS_COLOUR, PRIORITY_COLOUR } from '@/lib/taskConstants'
 import { createTaskAction, updateTaskAction, deleteTaskAction, type TaskInput } from '../taskActions'
+import { setViewPreferenceAction } from '../viewPrefActions'
 import { fmtTaskDate, taskToday, taskToInput, type Task, type Member, type ClientOpt } from './types'
+import { TASK_COLUMNS, TASK_VIEW_KEY } from './columns'
+import { mergeColumns, toConfig, type ColumnConfig, type ResolvedColumn } from '@/lib/viewColumns'
+import ColumnPicker from '@/components/ColumnPicker'
 import TaskKanban from './TaskKanban'
 import TaskCalendar from './TaskCalendar'
 
@@ -24,6 +28,52 @@ function Pill({ value, colour }: { value: string; colour: string }) {
       {value}
     </span>
   )
+}
+
+// Per-column cell padding/colour. Kept beside the renderer so the column mechanism stays
+// self-contained; the Due column reddens when overdue.
+function cellCls(key: string, idx: number, overdue: boolean): string {
+  const pad = idx === 0 ? 'px-4 py-2.5' : 'px-3 py-2.5'
+  if (key === 'due') return `${pad} whitespace-nowrap ${overdue ? 'text-[#E0572E] font-semibold' : 'text-[#5A5E66]'}`
+  if (key === 'task_type' || key === 'owner') return `${pad} text-[#5A5E66]`
+  if (key === 'next_action') return `${pad} text-[#5A5E66] max-w-[200px] truncate`
+  return pad
+}
+
+// The cell content for a given column key. Returning null for an unknown key keeps the
+// table resilient to a stale saved config.
+function taskCell(key: string, t: Task) {
+  switch (key) {
+    case 'title':
+      return (
+        <>
+          <div className="font-medium">{t.title}</div>
+          {t.servesPost && (
+            t.servesPost.href
+              ? <Link href={t.servesPost.href} className="text-xs text-[#5A5E66] hover:underline">↗ {t.servesPost.title}</Link>
+              : <span className="text-xs text-[#9398A1]">↗ {t.servesPost.title}</span>
+          )}
+        </>
+      )
+    case 'client':
+      return t.clientName ? (
+        <span className="inline-flex items-center gap-1.5 text-[#5A5E66]"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: t.clientColour ?? '#A6ABB3' }} />{t.clientName}</span>
+      ) : <span className="text-[#9398A1]">Internal</span>
+    case 'task_type':
+      return t.task_type ?? '—'
+    case 'owner':
+      return t.ownerName ?? <span className="text-[#9398A1]">Unassigned</span>
+    case 'status':
+      return <Pill value={t.status} colour={STATUS_COLOUR[t.status] ?? '#A6ABB3'} />
+    case 'priority':
+      return <Pill value={t.priority} colour={PRIORITY_COLOUR[t.priority] ?? '#9398A1'} />
+    case 'due':
+      return fmtTaskDate(t.due_date)
+    case 'next_action':
+      return t.next_action ?? '—'
+    default:
+      return null
+  }
 }
 
 function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, onClose, onSaved }: {
@@ -127,7 +177,7 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
 
 type ModalState = { open: boolean; task: Task | null; seed?: Partial<TaskInput>; servesLabel: string | null }
 
-export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient, currentUserId, loadError, prefill, initialView, initialOwner, initialStatus, initialClient }: {
+export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient, currentUserId, loadError, prefill, initialView, initialOwner, initialStatus, initialClient, savedColumns }: {
   tasks: Task[]
   teamMembers: Member[]
   clients: ClientOpt[]
@@ -139,6 +189,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
   initialOwner: string
   initialStatus: string
   initialClient: string
+  savedColumns: ColumnConfig[] | null
 }) {
   const router = useRouter()
   const [view, setViewState] = useState<View>(initialView)
@@ -153,6 +204,16 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
   )
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+
+  // Column preferences: merge the saved config with the current column set so a newly
+  // added column defaults to visible rather than vanishing for existing users.
+  const [columns, setColumns] = useState<ResolvedColumn[]>(() => mergeColumns(TASK_COLUMNS, savedColumns))
+  const visibleColumns = useMemo(() => columns.filter((c) => !c.hidden), [columns])
+  async function onColumnsChange(next: ResolvedColumn[]) {
+    setColumns(next)
+    const r = await setViewPreferenceAction(TASK_VIEW_KEY, toConfig(next))
+    if (r.error) setActionError(r.error)
+  }
 
   // Local copy for optimistic kanban moves; re-syncs whenever the server data changes.
   const [localTasks, setLocalTasks] = useState(tasks)
@@ -247,6 +308,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
           </select>
         )}
         <span className="text-xs text-[#9398A1] ml-auto">{visible.length} of {localTasks.length}</span>
+        {view === 'list' && <ColumnPicker columns={columns} onChange={onColumnsChange} />}
       </div>
 
       {loadError && (
@@ -263,43 +325,22 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
           <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wide text-[#9398A1] border-b border-[#ECECEE]">
-                <th className="font-semibold px-4 py-2.5">Task</th>
-                <th className="font-semibold px-3 py-2.5">Client</th>
-                <th className="font-semibold px-3 py-2.5">Type</th>
-                <th className="font-semibold px-3 py-2.5">Owner</th>
-                <th className="font-semibold px-3 py-2.5">Status</th>
-                <th className="font-semibold px-3 py-2.5">Priority</th>
-                <th className="font-semibold px-3 py-2.5">Due</th>
-                <th className="font-semibold px-3 py-2.5">Next action</th>
+                {visibleColumns.map((c, i) => (
+                  <th key={c.key} className={`font-semibold py-2.5 ${i === 0 ? 'px-4' : 'px-3'}`}>{c.label}</th>
+                ))}
                 <th className="px-3 py-2.5"></th>
               </tr>
             </thead>
             <tbody>
               {visible.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-[#9398A1]">No tasks.</td></tr>
+                <tr><td colSpan={visibleColumns.length + 1} className="px-4 py-8 text-center text-[#9398A1]">No tasks.</td></tr>
               ) : visible.map((t) => {
-                const overdue = t.due_date && t.due_date < today && t.status !== 'Complete'
+                const overdue = !!(t.due_date && t.due_date < today && t.status !== 'Complete')
                 return (
                   <tr key={t.id} className="border-b border-[#ECECEE] last:border-b-0 hover:bg-[#FBFBFC]">
-                    <td className="px-4 py-2.5">
-                      <div className="font-medium">{t.title}</div>
-                      {t.servesPost && (
-                        t.servesPost.href
-                          ? <Link href={t.servesPost.href} className="text-xs text-[#5A5E66] hover:underline">↗ {t.servesPost.title}</Link>
-                          : <span className="text-xs text-[#9398A1]">↗ {t.servesPost.title}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {t.clientName ? (
-                        <span className="inline-flex items-center gap-1.5 text-[#5A5E66]"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: t.clientColour ?? '#A6ABB3' }} />{t.clientName}</span>
-                      ) : <span className="text-[#9398A1]">Internal</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-[#5A5E66]">{t.task_type ?? '—'}</td>
-                    <td className="px-3 py-2.5 text-[#5A5E66]">{t.ownerName ?? <span className="text-[#9398A1]">Unassigned</span>}</td>
-                    <td className="px-3 py-2.5"><Pill value={t.status} colour={STATUS_COLOUR[t.status] ?? '#A6ABB3'} /></td>
-                    <td className="px-3 py-2.5"><Pill value={t.priority} colour={PRIORITY_COLOUR[t.priority] ?? '#9398A1'} /></td>
-                    <td className={`px-3 py-2.5 whitespace-nowrap ${overdue ? 'text-[#E0572E] font-semibold' : 'text-[#5A5E66]'}`}>{fmtTaskDate(t.due_date)}</td>
-                    <td className="px-3 py-2.5 text-[#5A5E66] max-w-[200px] truncate">{t.next_action ?? '—'}</td>
+                    {visibleColumns.map((c, i) => (
+                      <td key={c.key} className={cellCls(c.key, i, overdue)}>{taskCell(c.key, t)}</td>
+                    ))}
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-1 justify-end">
                         {t.status !== 'Complete' && (
