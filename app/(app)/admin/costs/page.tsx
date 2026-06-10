@@ -12,9 +12,9 @@ export default async function CostsPage() {
   const agencyId = access.agencyId
 
   const { data: agency, error } = await supabase
-    .from('agency')
+    .from('agency_internal')
     .select('cost_per_hour')
-    .eq('id', agencyId)
+    .eq('agency_id', agencyId)
     .maybeSingle()
   if (error) console.error('agency cost query failed:', error.message, error.code)
 
