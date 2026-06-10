@@ -5,6 +5,7 @@ import ChannelsSection, { type Channel } from './ChannelsSection'
 import ContactsSection, { type Contact } from './ContactsSection'
 import BrandAssetsSection, { type BrandAsset } from './BrandAssetsSection'
 import OwnershipSection from './OwnershipSection'
+import InvitePanel, { type Invite } from '../../InvitePanel'
 import type { ClientDefaults, TeamOption } from '../ClientFormFields'
 import type { Ownership } from '@/lib/ownershipRoles'
 
@@ -75,6 +76,14 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
     .eq('client_id', id)
     .maybeSingle()
 
+  const { data: invites } = await supabase
+    .from('invite')
+    .select('id, email, role, created_at, expires_at')
+    .eq('scope_type', 'client')
+    .eq('scope_id', id)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+
   const defaults: ClientDefaults = {
     name: client.name,
     status: client.status,
@@ -118,6 +127,15 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
           clientId={client.id}
           ownership={(ownership as Ownership | null) ?? null}
           teamMembers={(team as TeamOption[] | null) ?? []}
+        />
+      </div>
+
+      <div className="max-w-[680px] mt-10">
+        <InvitePanel
+          scopeType="client"
+          scopeId={client.id}
+          revalidate={`/clients/${client.id}`}
+          invites={(invites as Invite[] | null) ?? []}
         />
       </div>
     </>

@@ -12,10 +12,17 @@ export default function Callback() {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     const query = new URLSearchParams(window.location.search)
 
-    // Idempotent: grants client_approver membership for any portal-enabled contact
-    // whose email matches this user. Safe for agency users (0 grants). We await it
-    // so membership exists before the app loads, but never block login on a failure.
+    // Idempotent on every login, never blocks login on failure. Two grant paths:
+    // - accept_pending_invites: agency/client memberships backed by a pending invite.
+    // - claim_client_access: legacy portal-access contacts matched by email.
+    // Both derive everything server-side from auth.uid(); neither takes a parameter.
     async function claimThenHome() {
+      try {
+        const { error } = await supabase.rpc('accept_pending_invites')
+        if (error) console.error('accept_pending_invites failed:', error.message)
+      } catch (e) {
+        console.error('accept_pending_invites threw:', e)
+      }
       try {
         const { error } = await supabase.rpc('claim_client_access')
         if (error) console.error('claim_client_access failed:', error.message)

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getAccess } from '@/lib/access'
 import AccessEditor, { type AccessMember } from './AccessEditor'
+import InvitePanel, { type Invite } from '../../InvitePanel'
 
 export default async function AccessPage() {
   const supabase = await createClient()
@@ -14,6 +15,14 @@ export default async function AccessPage() {
   // membership is own-rows-only under RLS → list via the admin-only SECURITY DEFINER RPC.
   const { data: members, error } = await supabase.rpc('list_agency_members', { p_agency_id: agencyId })
   if (error) console.error('list_agency_members failed:', error.message, error.code)
+
+  const { data: invites } = await supabase
+    .from('invite')
+    .select('id, email, role, created_at, expires_at')
+    .eq('scope_type', 'agency')
+    .eq('scope_id', agencyId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -31,6 +40,15 @@ export default async function AccessPage() {
         }))}
         loadError={!!error}
       />
+
+      <div className="mt-8">
+        <InvitePanel
+          scopeType="agency"
+          scopeId={agencyId}
+          revalidate="/admin/access"
+          invites={(invites as Invite[] | null) ?? []}
+        />
+      </div>
     </div>
   )
 }
