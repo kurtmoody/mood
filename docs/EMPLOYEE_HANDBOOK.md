@@ -89,6 +89,9 @@ Within the agency team there are two permission levels:
 | **Archive** | Marking a client as no longer active. Their posts and tasks are then hidden from the team's working views by default (with a "Show archived" toggle to bring them back). Reversible — you can reactivate any time. **Does not affect what the client sees** in their own portal. |
 | **Invite** | An email-based way to give a teammate or a client contact access. They sign in with the normal magic link and access is granted automatically. |
 | **Export** | A downloadable backup (a ZIP of spreadsheets) of everything attached to a client — taken before permanently deleting them. |
+| **Grid view** | An agency-only, spreadsheet-style view of the calendar's posts grouped by client, for tracking production (designer, links, boost, budget, posted). |
+| **Production details** | The behind-the-scenes fields on a post — Designer, Design status, Drive/high-res/posted links, Boost, Ad budget, Date posted. Editable in the Grid or in the post drawer; clients never see them. |
+| **Designer** | The team member doing the design for a post (can be anyone in the directory, even without a login). Set in Production details. |
 
 ---
 
@@ -123,7 +126,7 @@ The navigation hides what you're not allowed to use, and the system also blocks 
 The calendar is the home screen for the agency. It shows planned posts on real dates.
 
 - **Combined view (default).** By default you see **all clients at once**, so you get the whole week/month across the agency in one place.
-- **Week / Month toggle.** Switch between a week view and a month view. Dates are **Malta time**, and weeks start on **Monday**.
+- **Week / Month / Grid toggle.** Switch between week, month, and **Grid** (agency-only — a dense production tracker; see below). Dates are **Malta time**, and weeks start on **Monday**.
 - **Move around.** Prev / Today / Next to change the week or month.
 - **Colours.** Each client has a **calendar colour**. Every post is filled with its client's colour, with a small **status dot** showing where it is in the workflow. In the combined view there's a **colour → client legend** so you know whose is whose.
 - **Filter by client.** Use the Clients filter to narrow to one or several clients. Your selection is saved in the page address, so you can bookmark or share a filtered view.
@@ -131,6 +134,14 @@ The calendar is the home screen for the agency. It shows planned posts on real d
 - **Drag to reschedule.** Agency users can **drag a post onto another day** (week or month view) to change its planned date — it keeps its time of day. If you drop it on a date in the past, Mood asks you to confirm, and (for approved/scheduled posts only) offers to mark it as posted. Clients can't drag.
 - **Other filters.** You can filter by status, by channel, and there's a "Needs my review" toggle that shows just the posts waiting on you.
 - **Archived clients.** Posts belonging to **archived** clients are hidden by default. A **"Show archived"** toggle brings them back (shown greyed out with an "Archived" tag). This is agency-only housekeeping — see §14.
+
+### The Grid view (production tracker)
+
+**Grid** (agency-only, third tab on the calendar) is a dense, spreadsheet-style tracker of the **same posts** as the calendar (the month you're on), **grouped by client** — like the old Monday board. Columns: post title, scheduled date, platform, **Designer**, **Design status**, overall status, **Boost**, **Ad budget**, **Drive link**, **High-res link**, Posted (Yes/No), **Posted link**, **Date posted**, and **PM**.
+
+- **Edit production fields right in the grid** — Designer (any active team member, including directory-only people without a login), design status, the links, boost, ad budget, dates. Changes save as you go (on leaving a cell or toggling). These are the same "Production details" you'll find in a post's drawer.
+- **Read-only in the grid:** the post title, scheduled date, the overall approval **status**, Posted (which is just "is the status Posted?"), and the PM (taken from the client's Lead PM). To change those, click the post title to open the full drawer (approval flow, caption, comments, etc.).
+- It's the **same data as the calendar** — same posts, same client filter, archived clients hidden unless "Show archived". Clients never see the grid.
 
 Clients see the same calendar idea, but only their own posts, and only from the point a post is sent to them onward. (Archiving a client never changes what that client sees in their own portal.)
 
@@ -300,6 +311,8 @@ Each task has: a title, an optional client (or "Internal" for non-client work), 
 
 **Archived clients:** tasks belonging to archived clients are hidden by default, with a "Show archived" toggle (same as the calendar). Internal tasks (no client) are never affected.
 
+**Task notifications (who gets pinged).** Each task quietly has a few **subscribers**: the **owner**, the person **accountable** (the client's Lead PM, or whoever's Accountable for that task type in the RACI matrix), and the **creator**. They get a notification when the task is **assigned** and whenever its **status changes** — except you never get pinged for your own action. To keep it calm, **emails** only go out for the meaningful moments (a task assigned to you, or moved to **Complete**, **Waiting on Client**, **On Hold**, or **Ready for Review**); every other status change shows in the in-app bell only, no email. Clicking a task notification opens the Tasks page.
+
 **Linking a task to a post:** a task can "serve" a specific post. From a post's detail panel you can **"Add task for this post"** (it pre-fills the client and links the task to that post). On the task side, you'll see which post it serves, with a link back to it. This connects the planning (calendar) and the doing (tasks).
 
 **Filtering & sharing:** the filters and view are saved in the page address, so a filtered Tasks view can be bookmarked or shared. The dashboard's task breakdowns link straight into a pre-filtered Tasks page.
@@ -325,10 +338,13 @@ Mood notifies the right people at the moments that matter (it's deliberately qui
 - A post is **sent to a client** → the client is notified ("ready for your review").
 - A client **approves** or **requests changes** → the agency is notified.
 - A **comment** is added → the other side is notified.
+- A **task** is **assigned** or its **status changes** → the task's subscribers are notified (see §16). To stay quiet, only the meaningful task moments are emailed (assigned, Complete, Waiting on Client, On Hold, Ready for Review); the rest are in-app only.
+
+You're never notified about your **own** action.
 
 **Where notifications show up:**
-- **The bell** (top bar, in-app): an unread count and a dropdown of recent items; click one to jump straight to the post. You can mark items read.
-- **Email** (via our email service, Resend): **live**. When a bell notification fires, the recipient also gets an email with the same message and an "Open in Mood" button that links straight to the post.
+- **The bell** (top bar, in-app): an unread count and a dropdown of recent items; click one to jump straight to the post — or to the Tasks page for a task notification. You can mark items read. The bell shows **everything**, including the in-app-only task nudges.
+- **Email** (via our email service, Resend): **live**. When an email-worthy notification fires, the recipient also gets an email with the same message and an "Open in Mood" button. Some in-app items (minor task status changes) deliberately **don't** email.
 
 ---
 
@@ -428,6 +444,20 @@ A ZIP of spreadsheets (CSVs): the client, contacts, posts, comments, internal no
 
 **Q: How do I customise the Tasks columns?**
 On the Tasks **List** view, click **Columns** to show/hide and drag to reorder. Your layout is saved for you. (The Task title column always stays.)
+
+**Q: Will I get pinged about tasks?**
+Yes — if you're a task's owner, the accountable person (the client's Lead PM), or its creator, you're notified when it's assigned and when its status changes. You won't be notified about your own changes, and only the meaningful status moves (Complete, Waiting on Client, On Hold, Ready for Review) send an email — the rest are bell-only.
+
+**Content grid**
+
+**Q: What's the Grid view on the calendar?**
+An agency-only, spreadsheet-style tracker of the same posts as the calendar, grouped by client, where you edit production fields (designer, links, boost, budget, posted) inline. It's the modern replacement for the Monday content board. Clients never see it.
+
+**Q: Why can't I change a post's status or date from the Grid?**
+Those are read-only in the grid on purpose — status changes go through the approval flow and dates through the calendar/drawer. Click the post title in the grid to open its drawer for everything else.
+
+**Q: Two of us edited the same post's production fields — whose wins?**
+Last save wins for the whole row. It's fine at our size, but if you and a colleague are editing the *same* post's production details at the same moment, coordinate so one doesn't overwrite the other.
 
 **Q: A client says they logged in but see nothing.**
 They'll only see posts that are in "client review" or later. If everything for them is still internal, there's nothing for them to see yet. Also confirm their contact has portal access and their login email matches the contact email.

@@ -183,7 +183,8 @@ Core tables are defined in `schema.sql`; later tables/columns are added by migra
 | `client_contact` (**agency-only**) | 0007 | `client_id`, `first_name`, `surname`, `role`, `email`, `phone`, `is_primary` (single-primary enforced), `portal_access` (invite toggle), `user_id` (nullable — links to a portal user via membership). |
 | `brand_asset` (**agency-only**) | 0008 | `client_id`, `kind` (logo/colour/font/guideline/other), `label`, `value/url`, `notes`. |
 | `media` (agency-upload) | 0018, +`sort_order` 0024 | `version_id` (→ content_version, **on delete cascade**), `storage_path` (**unique**), `mime_type`, `size_bytes`, `created_by`, `created_at`, `sort_order` (int, default 0). Private `content-media` bucket. |
-| `notification` (recipient-scoped) | 0019 | `user_id` (recipient), `type` (`ready_for_review`/`approved`/`changes_requested`/`comment`), `content_item_id` (→ content_item on delete cascade), `actor_id`, `body`, `read_at` (null = unread), `created_at`. |
+| `notification` (recipient-scoped) | 0019, +`email`/`task_id` 0041 | `user_id` (recipient), `type` (`ready_for_review`/`approved`/`changes_requested`/`comment`/`task_assigned`/`task_status`), `content_item_id` (→ content_item on delete cascade), `task_id` (→ task on delete cascade, 0041), `actor_id`, `body`, `email` (bool, default true — false = in-app only, 0041), `read_at` (null = unread), `created_at`. |
+| `task_subscriber` (agency-only) | 0041 | PK `(task_id, user_id)`; `source` (`owner`/`accountable`/`creator`/`manual`, CHECK), `created_at`. Who gets notified about a task. Agency-scoped read RLS (members of the task's agency); writes RPC-only. Seeded by `create_task`/`update_task`; one row per user, most-specific source wins. |
 | `client.calendar_colour` | 0025 | Per-client **calendar tag** colour (hex). **Deliberately distinct from `brand_colour`** (the client's brand-identity colour, schema.sql, untouched): a client's calendar fill may differ from its brand. `create_client`/`update_client` now take both `p_brand_colour` and `p_calendar_colour`. Null falls back to a stable palette colour at render (`lib/colour.ts`). |
 | `post_asset_link` (agency-write) | 0026 | `id`, `content_item_id` (→ content_item **on delete cascade**), `label`, `url`, `sort_order`, `created_by`, `created_at`. Labelled links per post (Drive folders, raw footage, final exports, …). **Status-aware read floor mirroring 0015** (agency any status; client `client_review+`). RPC-only writes. |
 | `raci_matrix` (agency reference) | 0027, editable 0032 | `id`, `agency_id`, `task_type`, `team_member_id` (→ team_member **on delete cascade**), `raci_value` (A/R/C/I/S), `created_at`; unique `(agency_id, task_type, team_member_id)`. Agency-scoped RLS read; **edited via the admin-only `set_raci_matrix` RPC (0032)** — no write policies. Seeded for Mood Agency (15 task types × 7 people). |
@@ -340,11 +341,18 @@ The Drawer shows **"Edit (new version)"** on frozen posts behind a `window.confi
   - `add_comment`: agency comment on a client-visible post → **portal**; client comment → **agency** (`comment`).
 - **Copy (0023):** bodies lead with client name + title, e.g. `Acme Co — "Launch teaser": ready for your review`. Single source of truth = `notification.body`.
 
+### Task subscriptions & events (migration 0041)
+Tasks have **subscribers** (`task_subscriber`) and fire their own notifications, reusing the same `notification` table + bell.
+- **Subscribers** are seeded from RACI/ownership when a task is created/updated: **owner** (the task's `owner_id` → user), **accountable** (the client's Lead PM via `client_ownership`, falling back to the agency RACI `A` person for the task's `task_type`), and **creator**. One row per user, most-specific source wins (owner > accountable > creator); a **manual** source is reserved for future explicit subscribes. `create_task` seeds them; `update_task` **re-seeds the derived rows on owner change** (manual rows preserved).
+- **Helper** `_notify_task(user_ids[], type, task_id, actor_id, body, email)` — one row per subscriber, **skipping the actor**, carrying the `task_id` and the `email` flag.
+- **Emit points:** **assignment** (`task_assigned`, on create-with-owner and on owner change) and **every status change** (`task_status`). 
+- **Email vs in-app-only:** assignment is email-eligible; a status change is email-eligible **only** for `Complete` / `Waiting on Client` / `On Hold` / `Ready for Review` — every other status change is **in-app only** (`email=false`), so the team isn't spammed on trivial nudges. The bell shows all of them; only `email=true` rows are mailed (see Email below).
+
 ### Bell (in-app)
-`NotificationBell.tsx` in the top bar (agency + client). Unread-count badge, dropdown of the 15 most recent, per-row + "Mark all as read" (scoped `update read_at` only), and **click-to-open** which resolves the post via the user's RLS-scoped client and deep-links to `/?client&week&view=week&post=<id>`. V1 polls on open (no realtime yet).
+`NotificationBell.tsx` in the top bar (agency + client). Unread-count badge, dropdown of the 15 most recent, per-row + "Mark all as read" (scoped `update read_at` only), and **click-to-open**: post notifications resolve the post via the user's RLS-scoped client and deep-link to `/?client&week&view=week&post=<id>`; **task notifications (0041) route to `/tasks`** (the row carries `task_id`; icons for `task_assigned`/`task_status`). Task notifications flow through the same bell automatically (they're `notification` rows under the recipient's own-rows RLS). V1 polls on open (no realtime yet).
 
 ### Email (Edge Function)
-`supabase/functions/notify-email/index.ts` (Deno). Triggered by a **Database Webhook** on `public.notification` INSERT. It is **deliver-only**: resolves the recipient's email (service-role `auth.admin.getUserById`) and sends via Resend. **Subject + body both come from `record.body`** (so email matches the bell exactly). Returns 200 on every path (incl. send failure) to avoid webhook retry storms. Optional shared-secret header check is present but commented (V1). Requires the verified Resend domain.
+`supabase/functions/notify-email/index.ts` (Deno). Triggered by a **Database Webhook** on `public.notification` INSERT. It is **deliver-only**: resolves the recipient's email (service-role `auth.admin.getUserById`) and sends via Resend. **It skips rows with `email = false`** (the in-app-only flag, 0041 — e.g. trivial task status nudges); the DB decides, the function still only delivers. **Subject + body both come from `record.body`** (so email matches the bell exactly); the link falls back to `/tasks` for task notifications. Returns 200 on every path (incl. send failure) to avoid webhook retry storms. Optional shared-secret header check is present but commented (V1). Requires the verified Resend domain. **Redeploy required** for the `email=false` skip to take effect (`supabase functions deploy notify-email`).
 
 ---
 
@@ -402,6 +410,7 @@ A **view-agnostic** mechanism for hide/show/reorder of table columns, shipped on
   - Shared add/edit **modal** uses `lib/taskConstants.ts`; clients have a "No client / internal" option. Writes via `create/update/delete_task`. Errors surfaced.
 - **Content ↔ task bridge (0031)** — a post's drawer lists its linked tasks + **"Add task for this post"** (opens the task modal prefilled with the post's client + `content_item_id`); the task list/modal show which post a task **serves** (links back to it). New tasks **default their owner to the client's Lead PM** (`client_ownership.lead_pm_id`) when a client is picked — editable, not a lock. Manual only (no auto-spawn yet).
 - **RACI matrix (0027, editable 0032)** — the responsibility grid, now **editable in the Admin area** (`/admin/raci`) via `set_raci_matrix`. Seeded for Mood Agency.
+- **Task subscriptions & notifications (0041)** — every task has subscribers (owner / accountable=client Lead PM→RACI `A` fallback / creator; manual reserved), seeded on create and re-seeded on owner change. **Assignment** and **status changes** notify all subscribers except the actor, surfaced in the existing bell (routing to `/tasks`). Email is sent only for meaningful events (assignment, Complete, Waiting on Client, On Hold, Ready for Review); all other status changes are **in-app only**. See §12.
 
 ### Admin area (0032, 0033, 0035)
 `/admin` — **agency_admin only** (nav `adminOnly`, `admin/layout.tsx` hard-redirect, and the RPCs re-check admin server-side). A settings landing structured to grow (a `SECTIONS` array):
@@ -417,13 +426,13 @@ A **view-agnostic** mechanism for hide/show/reorder of table columns, shipped on
 - **Real revocation (0020):** `set_contact_portal_access(..., false)` now also **deletes** the user's client-scope membership for that client (tightly scoped — agency/other-client memberships untouched), so an already-logged-in contact loses access immediately.
 
 ### Notifications
-Data layer + emit (0019), enriched copy (0023), in-app bell, email Edge Function (§12).
+Data layer + emit (0019), enriched copy (0023), in-app bell, email Edge Function, **task subscriptions + task events with an in-app-only vs email flag (0041)** (§12).
 
 ### Agency dashboard
 `/dashboard` (agency-only): a cross-client "needs attention" view aggregating `content_item` across **all** the agency's clients via RLS (no client filter). Sections — "Needs your action" (`internal_review`/`changes_requested`), "Awaiting client" (`client_review`, flagging items aged > 3 days), and a richer **task summary**: a prominent **overdue count** plus open-task breakdowns **By status** (→ `/tasks?status=`), **By owner** (→ `/tasks?owner=`), and **By client**. Each content row deep-links to the post. Read-only.
 
 ### Security (all pgTap-proven)
-Content read floor (0015), content tables RPC-only (0016), client transitions (0017), media table + storage policies (0018), notification RLS (0019), revoke (0020), versioning guards (0021), client version filter (0022), media reorder authorisation (0024), asset-link read floor + RPC auth (0026), task RLS + RPC auth (0028), client_ownership RLS + RPC auth (0030), RACI admin-write auth (0032), member-role admin-write + last-admin lockout (0033), team-member edit/deactivate auth (0034), invite create/accept auth incl. the client→agency leak guard (0035), permanent-delete auth + reassign/cascade + RACI merge (0036), view-preference own-rows RLS (0037), reschedule auth + mark-posted state-machine guard (0038), internal-note RPC auth + per-row agency resolution incl. the **client-leak guard** (0039), client status-setter auth + value validation (0040).
+Content read floor (0015), content tables RPC-only (0016), client transitions (0017), media table + storage policies (0018), notification RLS (0019), revoke (0020), versioning guards (0021), client version filter (0022), media reorder authorisation (0024), asset-link read floor + RPC auth (0026), task RLS + RPC auth (0028), client_ownership RLS + RPC auth (0030), RACI admin-write auth (0032), member-role admin-write + last-admin lockout (0033), team-member edit/deactivate auth (0034), invite create/accept auth incl. the client→agency leak guard (0035), permanent-delete auth + reassign/cascade + RACI merge (0036), view-preference own-rows RLS (0037), reschedule auth + mark-posted state-machine guard (0038), internal-note RPC auth + per-row agency resolution incl. the **client-leak guard** (0039), client status-setter auth + value validation (0040), task-subscriber RLS + seeding/event-actor-exclusion + cross-tenant (0041), set_post_meta auth + no-fork + cross-tenant (0042).
 
 ---
 
@@ -470,9 +479,11 @@ All RPCs are `SECURITY DEFINER` with `set search_path=''` and an `auth.uid()` nu
 ### Tasks (0028)
 | RPC | Signature | Auth | Notes |
 |---|---|---|---|
-| `create_task` | `(client_id?, task_type?, title, owner_id?, status?, priority?, due_date?, next_action?, notes?, content_item_id?)` → uuid | agency (derives agency from membership) | Validates client / owner / content item belong to the agency. `content_item_id` (0031) links the task to a post. |
-| `update_task` | `(task_id, … same fields incl. content_item_id …) → void` | agency member of the task's agency | **Full replace** (sets `updated_at`); mark-complete re-sends all fields with `status = 'Complete'`; kanban drag re-sends with the new `status`. |
+| `create_task` | `(client_id?, task_type?, title, owner_id?, status?, priority?, due_date?, next_action?, notes?, content_item_id?)` → uuid | agency (derives agency from membership) | Validates client / owner / content item belong to the agency. `content_item_id` (0031) links the task to a post. **Seeds subscribers + emits an assignment notification (0041).** |
+| `update_task` | `(task_id, … same fields incl. content_item_id …) → void` | agency member of the task's agency | **Full replace** (sets `updated_at`); mark-complete re-sends all fields with `status = 'Complete'`; kanban drag re-sends with the new `status`. **Re-seeds subscribers on owner change; emits assignment/status notifications (0041)** comparing the pre-update owner/status. |
 | `delete_task` | `(task_id) → void` | agency member of the task's agency | |
+
+> **Task subscription internals (0041, SECURITY DEFINER helpers):** `_task_accountable_user(task_id)` (Lead PM → RACI `A` fallback → user), `_seed_task_subscribers(task_id)` (replace derived owner/accountable/creator rows, preserve manual, most-specific source wins), `_notify_task(user_ids[], type, task_id, actor_id, body, email)` (one row per subscriber, skips the actor).
 
 ### Admin (0030, 0032, 0033)
 | RPC | Signature | Auth | Notes |
@@ -519,7 +530,7 @@ All RPCs are `SECURITY DEFINER` with `set search_path=''` and an `auth.uid()` nu
 | `add_channel` / `delete_channel` | channels | agency-for-client |
 
 ### Notification internals (SECURITY DEFINER helpers)
-`_notify(user_ids[], type, content_item_id, actor_id, body)`, `_agency_user_ids_for_client(client_id)`, `_portal_user_ids_for_client(client_id)`.
+`_notify(user_ids[], type, content_item_id, actor_id, body)` (content; rows default `email=true`), `_agency_user_ids_for_client(client_id)`, `_portal_user_ids_for_client(client_id)`, and the task variant `_notify_task(user_ids[], type, task_id, actor_id, body, email)` (0041).
 
 ### RLS helpers
 `is_agency_member()`, `is_agency_for_client(client_id)`, `is_client_user()`, `client_ids_for_user()`, `can_admin_agency(...)`.
@@ -572,7 +583,7 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 | 0038 | reschedule_post (+test) | `reschedule_content_item` — agency-only date-only move (no version fork) + state-machine-guarded `mark_posted`. No table change. |
 | 0039 | internal_notes (+test) | `internal_note` polymorphic table (post/task, agency-only, no client path) + `can_see_internal_note` RLS helper + `add/update/delete_internal_note`. Client-leak guard pgTap-proven. |
 | 0040 | set_client_status (+test) | `set_client_status` — lightweight agency-authorised archive/reactivate (validates the status value). No table change. |
-| 0041 | task_subscriptions (+test) | `task_subscriber` table + `notification.email`/`task_id` columns; RACI-seeded subscriptions (owner/accountable/creator) + task event notifications via `create_task`/`update_task` + `_notify_task`. *(Fuller writeup pending — see RPC/feature sections for content-grid; tasks-notification detail still to be folded in.)* |
+| 0041 | task_subscriptions (+test) | `task_subscriber` table + `notification.email`/`task_id` columns; RACI-seeded subscriptions (owner/accountable/creator) + task event notifications via `create_task`/`update_task` + `_notify_task`/`_seed_task_subscribers`/`_task_accountable_user`. Email only for meaningful events; rest in-app only. |
 | 0042 | post_production_meta (+test) | Production-metadata columns on `content_item` (designer_id, design_status, drive/high-res/posted urls, boost, ad_budget, date_posted) + `set_post_meta` — no-fork, full-overwrite, agency-only setter. Backs the content grid + drawer Production details. |
 
 > `schema.sql` is the fresh-setup reference **only** — it has a destructive reset block at the top; **never run it against the live DB.** New changes go in a migration.
@@ -636,7 +647,7 @@ supabase functions deploy notify-email
 Then ensure a **Database Webhook** exists on `public.notification` (event INSERT) pointing at the function URL. Email needs the verified Resend domain (`mail.mood.mt`). The Edge change only takes effect after redeploy.
 
 ### Outstanding operational tasks (as of 2026-06-10)
-- Migrations through **0039** are applied (permission management, team edit/deactivate, invites, permanent delete, per-user column prefs, drag-to-reschedule, and internal notes are live). **0040 (`set_client_status`) ships in this commit and still needs running** in the SQL editor before list archive/reactivate work against live. Apply each new `migrations/NNNN_*.sql` as it ships.
+- Migrations through **0040** are applied. **0041 (task subscriptions) and 0042 (post production metadata) ship in recent commits and still need running** in the SQL editor (run `notify pgrst, 'reload schema';` after each — they add columns/tables) before task notifications and the content-grid/Production-details fields work against live. **0041 also needs the Edge Function redeployed** (`supabase functions deploy notify-email`) so the `email=false` (in-app-only) skip takes effect. Apply each new `migrations/NNNN_*.sql` as it ships.
 - Email delivery is **live**: `notify-email` deployed + Database Webhook `notify_email_on_insert` on `notification` INSERT, sending via Resend (`mail.mood.mt`). Runbook: `supabase/functions/notify-email/DEPLOY.md`. (Notification emails only — **invite emails are not auto-sent yet**, see §19.)
 
 ### Environment
@@ -664,7 +675,7 @@ Then ensure a **Database Webhook** exists on `public.notification` (event INSERT
 - Planned tables: `notification` (built) and `notification_preference` (future).
 
 ### Recently completed (this development cycle)
-Client Approve/Request-changes UI · snapshot-on-send versioning · agency + client version history · agency dashboard · calendar filters · month-view media indicator · enriched notification copy · persisted media ordering + drag-reorder · real portal revocation · **combined all-clients calendar** · **per-client `calendar_colour` + legend** · **labelled asset links (0026)** · **RACI reference data (0027)** · **internal task list + dashboard summary (0028)** · sidebar logo · **legacy `asset` table dropped (0029)** · **per-client ownership + matrix (0030)** · **content↔task bridge + Lead-PM owner suggestion (0031)** · **admin area + editable RACI matrix (0032)** · **task List/Kanban/Calendar views + deeper dashboard breakdowns** · **permission management: Admin → Team access, promote/demote with last-admin lockout (0033)** · **team member edit + soft-deactivate/reactivate (0034)** · **agency + client invites, magic-link-native, accept-on-login (0035)** · **permanent delete: reassign-then-delete team members, guarded-cascade clients (0036)** · **per-user column preferences on the task list (0037)** · **drag-to-reschedule posts on the calendar, agency-only, with a past-date confirm (0038)** · **internal notes on posts + tasks, agency-only, author-owns, one polymorphic table (0039)** · **archive / reactivate / delete actions in the clients list, with a lightweight `set_client_status` setter + type-the-name delete confirm (0040)**.
+Client Approve/Request-changes UI · snapshot-on-send versioning · agency + client version history · agency dashboard · calendar filters · month-view media indicator · enriched notification copy · persisted media ordering + drag-reorder · real portal revocation · **combined all-clients calendar** · **per-client `calendar_colour` + legend** · **labelled asset links (0026)** · **RACI reference data (0027)** · **internal task list + dashboard summary (0028)** · sidebar logo · **legacy `asset` table dropped (0029)** · **per-client ownership + matrix (0030)** · **content↔task bridge + Lead-PM owner suggestion (0031)** · **admin area + editable RACI matrix (0032)** · **task List/Kanban/Calendar views + deeper dashboard breakdowns** · **permission management: Admin → Team access, promote/demote with last-admin lockout (0033)** · **team member edit + soft-deactivate/reactivate (0034)** · **agency + client invites, magic-link-native, accept-on-login (0035)** · **permanent delete: reassign-then-delete team members, guarded-cascade clients (0036)** · **per-user column preferences on the task list (0037)** · **drag-to-reschedule posts on the calendar, agency-only, with a past-date confirm (0038)** · **internal notes on posts + tasks, agency-only, author-owns, one polymorphic table (0039)** · **archive / reactivate / delete actions in the clients list, with a lightweight `set_client_status` setter + type-the-name delete confirm (0040)** · **RACI-seeded task subscriptions + task event notifications with an in-app-only vs email flag (0041)** · **post production metadata + the agency content-grid view + drawer Production details, via the no-fork `set_post_meta` (0042)**.
 
 ---
 
@@ -694,4 +705,4 @@ Client Approve/Request-changes UI · snapshot-on-send versioning · agency + cli
 
 ---
 
-*This document reflects the codebase at migration 0042. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list. (Note: 0041 task-subscriptions has a ledger entry but still needs a fuller §12/§14 writeup.)*
+*This document reflects the codebase at migration 0042. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*
