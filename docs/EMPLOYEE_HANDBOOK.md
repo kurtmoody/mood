@@ -92,6 +92,11 @@ Within the agency team there are two permission levels:
 | **Grid view** | An agency-only, spreadsheet-style view of the calendar's posts grouped by client, for tracking production (designer, links, boost, budget, posted). |
 | **Production details** | The behind-the-scenes fields on a post — Designer, Design status, Drive/high-res/posted links, Boost, Ad budget, Date posted. Editable in the Grid or in the post drawer; clients never see them. |
 | **Designer** | The team member doing the design for a post (can be anyone in the directory, even without a login). Set in Production details. |
+| **Timesheet** | Internal logging of time spent on a client (timer or manual entry). Agency-only; clients never see it. |
+| **Capacity** | A per-person view of planned hours (a task's estimate spread over its start→due weeks) against a 40-hour week, on the dashboard. Hours only — visible to everyone. |
+| **Job value** | The agreed price of a job (a task), with an invoice status (not invoiced / invoiced / paid). Admin/agency-internal. |
+| **Cost per hour** | The agency's blended internal hourly cost (admins set it). Used to estimate time-cost in profitability. |
+| **Profitability / margin** | Value − time-cost for a job, shown on the admin-only Reports page. Margin % = margin ÷ value. |
 
 ---
 
@@ -275,6 +280,16 @@ You must **archive before you can delete** — there's no one-click delete of an
 
 The **Team** page is the agency staff directory. You can add a member, **edit** their name/role/email, and **deactivate** (and later reactivate) them — deactivated members drop out of assignment dropdowns (task owner, ownership, RACI) but keep any login. There's an **Active / All** view so deactivated people aren't lost. Admins can also **permanently delete** a member, which first asks you to pick a **successor** to inherit their tasks, ownership and RACI.
 
+### Timesheets (internal time logging)
+
+If an admin switches on **Timesheet** for a client (on the client's page), a Timesheet section appears for logging internal time against that client. **Clients never see this.**
+
+- **Timer** — hit **Start** to run a live timer; **Stop** saves it. The timer lives on the server, so it keeps running if you refresh or move around the app, and you can adjust the end time when you stop (handy if you forgot to stop it). You can only have **one timer running at a time**.
+- **Manual entry** — log a block of time with a start and end (and an optional task + note) after the fact.
+- **Entries list** — everyone's logged time for the client; you can edit or delete **your own** entries.
+
+Time can be logged against a specific task for that client, or just against the client generally. (Logged time also feeds the profitability report — §19.)
+
 ---
 
 ## 15. Ownership and RACI
@@ -297,7 +312,7 @@ In short: **ownership** = who owns roles for a *specific client*; **RACI** = who
 
 Tasks are the team's internal to-do system. **Clients never see tasks** — they're entirely internal.
 
-Each task has: a title, an optional client (or "Internal" for non-client work), a task type, an owner, a status, a priority, a due date, a "next action", and notes.
+Each task has: a title, an optional client (or "Internal" for non-client work), a task type, an owner, a status, a priority, a due date, a "next action", and notes — plus, for planning and reporting: an **estimated hours**, a **start date** (used by the capacity planner, §17), and a **value** with an **invoice status** (not invoiced / invoiced / paid) and a "value visible to client" toggle (used by the profitability report, §19; the toggle is a future gate — clients don't see values yet).
 
 - **Statuses:** Not Started, In Progress, Waiting on Client, Ready for Review, Complete, On Hold.
 - **Priorities:** Low, Medium, High, Urgent.
@@ -326,8 +341,9 @@ The **Dashboard** (agency-only) is a one-glance "what needs attention across all
 - **Needs your action** — posts in internal review or changes-requested.
 - **Awaiting client** — posts in client review, flagging any that have been waiting more than a few days.
 - **Tasks summary** — a prominent **overdue** count, plus open tasks broken down **by status**, **by owner**, and **by client**. Each breakdown links straight into a pre-filtered Tasks page.
+- **Capacity** — a per-person, per-week view of **planned hours vs a 40-hour week**. Each task's estimated hours are spread evenly across its start→due weeks, so you can see who's overloaded and who has room. A range control switches between weeks and (further out) months. Alongside each person it shows honesty notes — hours that are estimated-but-undated ("unscheduled"), tasks with no estimate, and on-hold tasks — so the weekly numbers are upfront about what they leave out. This is about **hours only** — everyone on the team can see it; it never shows money.
 
-It's read-only — it's there to tell you where to look, then you click through. Archived clients' posts and tasks are left out of these counts by default (there's a **"Show archived"** toggle), so the numbers match what you see on the calendar and Tasks views.
+It's read-only — it's there to tell you where to look, then you click through. Archived clients' posts and tasks are left out of these counts by default (there's a **"Show archived"** toggle), so the numbers match what you see on the calendar and Tasks views. (Capacity deliberately *does* count archived clients' tasks — committed work is still work.)
 
 ---
 
@@ -354,8 +370,19 @@ Only **admins** see the **Admin** item in the sidebar. It's for agency-level set
 
 - **RACI matrix** — edit the responsibility grid (who's A/R/S/C/I for each task type). It's a grid of dropdowns; set them and save.
 - **Team access** — promote or demote team members between **Admin** and **Member**. There's a safety rule: **you can't remove the last admin** — at least one admin must always exist (the control is disabled for the final admin). This page also has the **invite a teammate** panel (invite an agency member by email; pending invites listed with Revoke).
+- **Cost per hour** — set the agency's blended internal hourly cost. This is sensitive and **admins only** — it feeds the profitability report's cost side. Leave it blank if you don't want margins calculated.
 
 If you need to be made an admin, ask one of the current admins (Michelle or Sandrina).
+
+### Reports — profitability (admins only)
+
+A separate **Reports** item in the sidebar (admins only) shows **profitability per job**: for each job (task with a value or logged time), grouped by client — its **Value** (the full agreed price), the **Cost** (time logged in the selected date range × the cost-per-hour rate), the **Margin** and margin %, and its **invoice status**. Each client gets a subtotal, an "**Unattributed time**" line for time logged against the client but not a specific job, and a **"to invoice"** figure (the value of jobs not yet invoiced). There's a grand total and date-range presets (day/week/month/quarter/year/custom).
+
+Two honesty points it shows you:
+- **Value isn't split across dates** — it's the full price, while cost only counts time logged in the chosen range. So for a job still in progress, a narrow range shows only part of its cost, and the margin is partial. Margins are accurate for fully-logged jobs.
+- If **no cost rate is set**, costs and margins can't be calculated — it says so (rather than pretending everything is 100% margin) and points you to Admin → Cost per hour.
+
+**Money lives only here.** The dashboard's capacity view (hours) is for everyone; **euros — value, cost, margin — are admin-only and appear only on Reports.**
 
 ---
 
@@ -461,6 +488,23 @@ Last save wins for the whole row. It's fine at our size, but if you and a collea
 
 **Q: A client says they logged in but see nothing.**
 They'll only see posts that are in "client review" or later. If everything for them is still internal, there's nothing for them to see yet. Also confirm their contact has portal access and their login email matches the contact email.
+
+**Timesheets & reporting**
+
+**Q: How do I log time on a client?**
+If the client has Timesheet switched on (an admin does that on the client's page), use the Timesheet section there — Start/Stop the timer, or add a manual entry. Clients never see any of it.
+
+**Q: My timer is still running from yesterday — did I lose the time?**
+No. The timer runs on the server, so it survives refreshes and navigation. When you Stop it, you can correct the end time to when you actually finished.
+
+**Q: Who can see job values, costs and margins?**
+Only **admins**, and only on the **Reports** page. The dashboard's capacity view (hours) is for everyone, but money — value, cost, margin — is admin-only. Clients never see values.
+
+**Q: The Reports margins look too good / show no cost.**
+Two likely reasons: no **cost-per-hour** is set (Admin → Cost per hour) so cost can't be calculated; or you're looking at a narrow date range — value is the full price but cost only counts time logged in that range, so an in-progress job shows a partial (over-stated) margin. Margins are accurate for fully-logged jobs.
+
+**Q: Why is a person shown as overloaded on the capacity view?**
+Their assigned tasks' estimated hours, spread across each task's start→due weeks, exceed 40 in that week. Adjust estimates, dates, or who owns what.
 
 **Tasks**
 
