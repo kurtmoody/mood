@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { deleteClientAction, type FormState } from './actions'
+import { exportClientBundle } from '@/lib/exportClient'
 
 const initial: FormState = { error: null, ok: false }
 
@@ -46,10 +47,42 @@ function DeleteModal({
   // On success the action redirects to /clients, so there's no ok state to handle here.
   const [state, action, pending] = useActionState(deleteClientAction, initial)
 
+  // Export is a decoupled, repeatable prior step — never auto-deletes, and delete never
+  // auto-exports. The user exports, verifies, then deletes.
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+  async function onExport() {
+    setExporting(true)
+    setExportError(null)
+    const r = await exportClientBundle(clientId, clientName)
+    setExporting(false)
+    if (r.error) setExportError(r.error)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
         <div className="text-sm font-semibold mb-2">Delete {clientName} permanently</div>
+
+        {/* Step 1 — back up first. */}
+        <div className="rounded-xl border border-[#ECECEE] bg-[#FBFBFC] p-4 mb-4">
+          <div className="text-sm font-semibold mb-1">1. Export client data</div>
+          <p className="text-sm text-[#5A5E66] mb-3">
+            Download a backup of this client&rsquo;s data before deleting. This is your only chance — deletion is permanent.
+          </p>
+          <button
+            type="button"
+            onClick={onExport}
+            disabled={exporting}
+            className="text-sm border border-[#E2E2E5] rounded-lg px-4 py-2 font-medium hover:bg-white disabled:opacity-50"
+          >
+            {exporting ? 'Preparing…' : 'Export client data (ZIP)'}
+          </button>
+          {exportError && <p className="text-sm text-red-600 mt-2">{exportError}</p>}
+        </div>
+
+        {/* Step 2 — the deliberate final act. */}
+        <div className="text-sm font-semibold mb-1">2. Delete</div>
         <p className="text-sm text-[#5A5E66] mb-4">
           This permanently deletes {clientName} and ALL associated data — content, versions, comments, approvals,
           tasks. This cannot be undone.
