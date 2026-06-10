@@ -16,6 +16,9 @@ export type Task = {
   notes: string | null
   estimated_hours: number | null
   start_date: string | null
+  value: number | null
+  value_client_visible: boolean
+  invoice_status: string
   clientName: string | null
   clientColour: string | null
   ownerName: string | null
@@ -32,6 +35,7 @@ export function taskToInput(t: Task): TaskInput {
     status: t.status, priority: t.priority, due_date: t.due_date, next_action: t.next_action,
     notes: t.notes, content_item_id: t.content_item_id,
     estimated_hours: t.estimated_hours, start_date: t.start_date,
+    value: t.value, value_client_visible: t.value_client_visible, invoice_status: t.invoice_status,
   }
 }
 

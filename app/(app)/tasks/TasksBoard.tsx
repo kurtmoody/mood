@@ -20,6 +20,7 @@ type View = 'list' | 'kanban' | 'calendar'
 const VIEWS: View[] = ['list', 'kanban', 'calendar']
 const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-2.5 py-1.5 text-sm bg-white'
 const PRIORITY_RANK: Record<string, number> = { Urgent: 0, High: 1, Medium: 2, Low: 3 }
+const INVOICE_LABEL: Record<string, string> = { not_invoiced: 'not invoiced', invoiced: 'invoiced', paid: 'paid' }
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function Pill({ value, colour }: { value: string; colour: string }) {
@@ -78,6 +79,10 @@ function taskCell(key: string, t: Task) {
         : fmtTaskDate(t.due_date)
     case 'estimate':
       return t.estimated_hours != null ? `${t.estimated_hours}h` : '—'
+    case 'value':
+      return t.value != null
+        ? <span className="whitespace-nowrap">€{t.value} <span className="text-[#9398A1]">· {INVOICE_LABEL[t.invoice_status] ?? t.invoice_status}</span></span>
+        : '—'
     case 'next_action':
       return t.next_action ?? '—'
     default:
@@ -99,7 +104,8 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
   const [form, setForm] = useState<TaskInput>(task ? taskToInput(task) : {
     client_id: null, task_type: null, title: '', owner_id: null,
     status: 'Not Started', priority: 'Medium', due_date: null, next_action: null, notes: null,
-    content_item_id: null, estimated_hours: null, start_date: null, ...seed,
+    content_item_id: null, estimated_hours: null, start_date: null,
+    value: null, value_client_visible: false, invoice_status: 'not_invoiced', ...seed,
   })
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -159,6 +165,24 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
           <div>
             <label className="block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Estimated hours</label>
             <input type="number" step="0.5" min="0" value={form.estimated_hours ?? ''} onChange={(e) => set('estimated_hours', e.target.value === '' ? null : Number(e.target.value))} className={fieldCls} placeholder="e.g. 3" />
+          </div>
+          <div>
+            <label className="block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Value (€)</label>
+            <input type="number" step="0.01" min="0" value={form.value ?? ''} onChange={(e) => set('value', e.target.value === '' ? null : Number(e.target.value))} className={fieldCls} placeholder="e.g. 500" />
+          </div>
+          <div>
+            <label className="block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Invoice status</label>
+            <select value={form.invoice_status} onChange={(e) => set('invoice_status', e.target.value)} className={fieldCls}>
+              <option value="not_invoiced">Not invoiced</option>
+              <option value="invoiced">Invoiced</option>
+              <option value="paid">Paid</option>
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className="flex items-center gap-2 text-sm text-[#5A5E66]">
+              <input type="checkbox" checked={form.value_client_visible} onChange={(e) => set('value_client_visible', e.target.checked)} />
+              Value visible to client
+            </label>
           </div>
           <div>
             <label className="block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Status</label>

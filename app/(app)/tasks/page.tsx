@@ -21,7 +21,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   // RLS scopes task to the agency; single-FK embeds (client/owner/content) are unambiguous.
   const { data: tasks, error } = await supabase
     .from('task')
-    .select('id, client_id, content_item_id, task_type, title, owner_id, status, priority, due_date, next_action, notes, estimated_hours, start_date, client:client_id ( name, calendar_colour, status ), owner:owner_id ( full_name ), content:content_item_id ( id, title, client_id, scheduled_at )')
+    .select('id, client_id, content_item_id, task_type, title, owner_id, status, priority, due_date, next_action, notes, estimated_hours, start_date, value, value_client_visible, invoice_status, client:client_id ( name, calendar_colour, status ), owner:owner_id ( full_name ), content:content_item_id ( id, title, client_id, scheduled_at )')
     .order('created_at', { ascending: false })
   if (error) console.error('tasks query failed:', error.message, error.code)
 
@@ -53,6 +53,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     notes: t.notes,
     estimated_hours: t.estimated_hours,
     start_date: t.start_date,
+    value: t.value,
+    value_client_visible: t.value_client_visible ?? false,
+    invoice_status: t.invoice_status ?? 'not_invoiced',
     clientName: t.client?.name ?? null,
     clientColour: t.client ? clientColour({ id: t.client_id, calendar_colour: t.client.calendar_colour }) : null,
     ownerName: t.owner?.full_name ?? null,

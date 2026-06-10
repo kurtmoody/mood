@@ -13,5 +13,6 @@ export const TASK_COLUMNS: ColumnDef[] = [
   { key: 'priority', label: 'Priority', lockable: true },
   { key: 'due', label: 'Due', lockable: true },
   { key: 'estimate', label: 'Est.', lockable: true },
+  { key: 'value', label: 'Value', lockable: true },
   { key: 'next_action', label: 'Next action', lockable: true },
 ]
