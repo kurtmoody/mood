@@ -21,8 +21,10 @@ type NotificationRecord = {
   user_id: string
   type: string
   content_item_id: string | null
+  task_id: string | null
   actor_id: string | null
   body: string | null
+  email: boolean | null
   read_at: string | null
   created_at: string
 }
@@ -60,6 +62,11 @@ Deno.serve(async (req) => {
       console.log('notify-email: no record/user_id in payload, skipping')
       return json({ skipped: 'no record' })
     }
+    // In-app-only rows (email=false, e.g. trivial task status nudges) never email. The DB
+    // decides; this function still only delivers. (Null/absent = legacy → email, as before.)
+    if (record.email === false) {
+      return json({ skipped: 'in-app only' })
+    }
 
     // Service-role client — needed to read the auth schema for the recipient's email.
     const supabase = createClient(
@@ -86,7 +93,9 @@ Deno.serve(async (req) => {
     // matches the bell exactly. Subject is the body, trimmed to a sensible length.
     const bodyText = record.body?.trim() ?? ''
     const subject = bodyText ? (bodyText.length > 120 ? bodyText.slice(0, 119) + '…' : bodyText) : 'Mood update'
-    const link = record.content_item_id ? `${APP_URL}/?post=${record.content_item_id}` : APP_URL
+    const link = record.content_item_id
+      ? `${APP_URL}/?post=${record.content_item_id}`
+      : record.task_id ? `${APP_URL}/tasks` : APP_URL
     const message = bodyText ? escapeHtml(bodyText) : subject
 
     const html = `

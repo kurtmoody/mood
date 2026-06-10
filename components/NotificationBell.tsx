@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bell, Eye, Check, PencilLine, MessageSquare, type LucideIcon } from 'lucide-react'
+import { Bell, Eye, Check, PencilLine, MessageSquare, UserPlus, ListChecks, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { maltaDate, mondayOf } from '@/lib/week'
 
@@ -10,6 +10,7 @@ type Notif = {
   id: string
   type: string
   content_item_id: string | null
+  task_id: string | null
   body: string | null
   read_at: string | null
   created_at: string
@@ -20,6 +21,8 @@ const TYPE_ICON: Record<string, LucideIcon> = {
   approved: Check,
   changes_requested: PencilLine,
   comment: MessageSquare,
+  task_assigned: UserPlus,
+  task_status: ListChecks,
 }
 
 function timeAgo(iso: string) {
@@ -56,7 +59,7 @@ export default function NotificationBell() {
     setLoading(true)
     const { data } = await supabase
       .from('notification')
-      .select('id, type, content_item_id, body, read_at, created_at')
+      .select('id, type, content_item_id, task_id, body, read_at, created_at')
       .order('created_at', { ascending: false })
       .limit(15)
     setItems((data as Notif[] | null) ?? [])
@@ -96,6 +99,8 @@ export default function NotificationBell() {
   async function openNotification(n: Notif) {
     await markRead(n)
     setOpen(false)
+    // Task notifications route to the tasks page; post notifications resolve to the post.
+    if (n.task_id) { router.push('/tasks'); return }
     if (!n.content_item_id) return
     // RLS-scoped resolve: a post the user can't see (or that's gone) returns null →
     // we simply don't navigate. No privileged fetch; visibility is enforced by RLS.
