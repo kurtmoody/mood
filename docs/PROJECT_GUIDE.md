@@ -1,6 +1,6 @@
 # Mood — Project Guide
 
-**Status:** Internal build, actively developed. Last updated 2026-06-10 (migration 0039).
+**Status:** Internal build, actively developed. Last updated 2026-06-10 (migration 0040).
 **Audience:** Engineers, product managers, and anyone picking this project up at any point.
 **Scope of this document:** A complete reference for what Mood is, how it's built, and how to operate it. It is the single source of truth for architecture, the data/security model, every shipped feature, the full RPC and migration ledger, conventions, and the operational runbook.
 
@@ -24,7 +24,7 @@
 12. [Notifications (bell + email)](#12-notifications)
 13. [Feature inventory](#13-feature-inventory)
 14. [RPC reference](#14-rpc-reference)
-15. [Migration ledger (0001–0039)](#15-migration-ledger)
+15. [Migration ledger (0001–0040)](#15-migration-ledger)
 16. [Conventions & hard-won gotchas](#16-conventions--hard-won-gotchas)
 17. [Testing (pgTap)](#17-testing-pgtap)
 18. [Operational runbook](#18-operational-runbook)
@@ -356,7 +356,7 @@ Everything below is **built and shipped** unless marked otherwise.
 Persistent sidebar (pinnable on desktop, off-canvas on mobile) + top bar. Nav gated by role: clients see only Calendar; agency sees Calendar, Dashboard, Clients, Team. Dashboard nav has a "needs your action" count badge. User menu with sign-out.
 
 ### Client CRM
-- `/clients` list + create (`create_client`).
+- `/clients` list + create (`create_client`), with **per-row actions (0040)**: **Archive / Reactivate** (any agency member; Archive behind a confirm, Reactivate restorative) via `set_client_status`, and **Delete permanently** (admin-only, **archived clients only** — mirrors the detail-page Danger-zone gate) opening the export-then-delete dialog: Step 1 "Export client data (ZIP)" (`exportClientBundle`), Step 2 **type-the-client-name-to-confirm** → `delete_client`. The list refreshes after each action.
 - `/clients/[id]` detail/edit (`update_client`) with account owner from the team directory.
 - `/team` agency staff directory — add (`add_team_member`), **edit + soft-deactivate/reactivate (0034)** (`update_team_member`/`set_team_member_active`; an Active/All filter keeps deactivated members reachable), and **admin-only permanent delete (0036)**. Deactivated members drop out of assignment dropdowns.
 - **Contacts** CRUD per client (single-primary enforced) with a **portal-access invite toggle** (`set_contact_portal_access`).
@@ -422,7 +422,7 @@ Data layer + emit (0019), enriched copy (0023), in-app bell, email Edge Function
 `/dashboard` (agency-only): a cross-client "needs attention" view aggregating `content_item` across **all** the agency's clients via RLS (no client filter). Sections — "Needs your action" (`internal_review`/`changes_requested`), "Awaiting client" (`client_review`, flagging items aged > 3 days), and a richer **task summary**: a prominent **overdue count** plus open-task breakdowns **By status** (→ `/tasks?status=`), **By owner** (→ `/tasks?owner=`), and **By client**. Each content row deep-links to the post. Read-only.
 
 ### Security (all pgTap-proven)
-Content read floor (0015), content tables RPC-only (0016), client transitions (0017), media table + storage policies (0018), notification RLS (0019), revoke (0020), versioning guards (0021), client version filter (0022), media reorder authorisation (0024), asset-link read floor + RPC auth (0026), task RLS + RPC auth (0028), client_ownership RLS + RPC auth (0030), RACI admin-write auth (0032), member-role admin-write + last-admin lockout (0033), team-member edit/deactivate auth (0034), invite create/accept auth incl. the client→agency leak guard (0035), permanent-delete auth + reassign/cascade + RACI merge (0036), view-preference own-rows RLS (0037), reschedule auth + mark-posted state-machine guard (0038), internal-note RPC auth + per-row agency resolution incl. the **client-leak guard** (0039).
+Content read floor (0015), content tables RPC-only (0016), client transitions (0017), media table + storage policies (0018), notification RLS (0019), revoke (0020), versioning guards (0021), client version filter (0022), media reorder authorisation (0024), asset-link read floor + RPC auth (0026), task RLS + RPC auth (0028), client_ownership RLS + RPC auth (0030), RACI admin-write auth (0032), member-role admin-write + last-admin lockout (0033), team-member edit/deactivate auth (0034), invite create/accept auth incl. the client→agency leak guard (0035), permanent-delete auth + reassign/cascade + RACI merge (0036), view-preference own-rows RLS (0037), reschedule auth + mark-posted state-machine guard (0038), internal-note RPC auth + per-row agency resolution incl. the **client-leak guard** (0039), client status-setter auth + value validation (0040).
 
 ---
 
@@ -510,6 +510,7 @@ All RPCs are `SECURITY DEFINER` with `set search_path=''` and an `auth.uid()` nu
 | `claim_client_access` | `() → int` | self (on login) — inserts membership for portal-enabled contacts matching the user's email |
 | `set_contact_portal_access` | `(contact_id, enabled) → void` | agency-for-client — on revoke, also deletes the matching client-scope membership |
 | `create_client` / `update_client` | CRM (incl. `p_brand_colour`, `p_calendar_colour`) | agency / can-admin |
+| `set_client_status` (0040) | `(client_id, status) → void` — lightweight archive/reactivate; validates status ∈ prospect/active/paused/archived | agency member of the client's agency |
 | `add_team_member` | team directory | agency |
 | `add_contact` / `update_contact` / `delete_contact` | contacts | agency-for-client |
 | `add_brand_asset` / `update_brand_asset` / `delete_brand_asset` | brand assets | agency-for-client |
@@ -568,6 +569,7 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 | 0037 | view_preferences (+test) | `user_view_preference` table (own-rows-only RLS) + `set_view_preference` upsert RPC. Per-user column prefs. |
 | 0038 | reschedule_post (+test) | `reschedule_content_item` — agency-only date-only move (no version fork) + state-machine-guarded `mark_posted`. No table change. |
 | 0039 | internal_notes (+test) | `internal_note` polymorphic table (post/task, agency-only, no client path) + `can_see_internal_note` RLS helper + `add/update/delete_internal_note`. Client-leak guard pgTap-proven. |
+| 0040 | set_client_status (+test) | `set_client_status` — lightweight agency-authorised archive/reactivate (validates the status value). No table change. |
 
 > `schema.sql` is the fresh-setup reference **only** — it has a destructive reset block at the top; **never run it against the live DB.** New changes go in a migration.
 
@@ -584,6 +586,7 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 - **ALL content writes go through SECURITY DEFINER RPCs.** No permissive write policies on content tables (an inline RLS `WITH CHECK` subquery on `membership` silently fails). Authorisation is inside each RPC.
 - **Storage:** private bucket; display via batched `createSignedUrls`; never `getPublicUrl`; `<img>` not `next/image`; upload path `<client_id>/<content_item_id>/<version_id>/<filename>`.
 - **Dates** are Europe/Malta, week starts Monday — use `lib/week.ts`; bucket posts by real date, never weekday. For a **date-only move** preserving time-of-day, use `rescheduleToDateMalta` (shifts by Malta wall-clock, not UTC) — never add/subtract on the UTC instant.
+- **Change client status via `set_client_status`, not `update_client` (0040).** Status changes (archive/reactivate) go through the lightweight `set_client_status(client_id, status)` RPC, which writes only `status`. The heavy `update_client` resends every field, and its status write (`status = coalesce(p_status,'active')`) **exhibited a status-revert this session** — saving "Archived" via the edit form came back as "Active". The clients-list archive/reactivate actions deliberately use `set_client_status` and are unaffected. ⚠️ The edit-form path through `update_client` was **not** changed in this slice, so until that revert is root-caused, treat `set_client_status` as the reliable way to set status and don't reroute archiving through `update_client`.
 - **Polymorphic tables have no FK safety net — resolve the parent's agency per-row (0039).** `internal_note.parent_id` points at either `content_item` or `task` by `parent_type`, so there's no foreign key to lean on. Both layers must resolve the parent's agency themselves and gate on membership: the **RLS read** via `can_see_internal_note(parent_type, parent_id)` (`post → is_agency_for_client(client_id)`; `task → is_agency_member(agency_id)`), and **every write RPC** by resolving `agency_id` from the parent before inserting. A missing parent resolves to null → the helpers return false → fails closed. The **client-leak guard** (a client cannot read internal notes on their own post) is pgTap-proven. If you add another polymorphic parent table, extend both the helper and the RPCs — don't assume an FK will catch a bad `parent_id`.
 - **Reschedule bypasses `update_post` on purpose (0038).** `update_post` **forks a new version and bounces frozen posts to `internal_review`** — correct for a body/title edit, catastrophic for a drag-to-reschedule (it would silently un-approve a post and spawn a spurious v2). Drag-to-reschedule therefore uses the dedicated `reschedule_content_item`, which only writes `scheduled_at` (+ optional `mark_posted`). Don't reroute it through `update_post`.
 - **Migrations are manual + idempotent.** Apply schema changes to live **before** pushing app code that depends on them.
@@ -628,7 +631,7 @@ supabase functions deploy notify-email
 Then ensure a **Database Webhook** exists on `public.notification` (event INSERT) pointing at the function URL. Email needs the verified Resend domain (`mail.mood.mt`). The Edge change only takes effect after redeploy.
 
 ### Outstanding operational tasks (as of 2026-06-10)
-- Migrations through **0039** are applied (permission management, team edit/deactivate, invites, permanent delete, per-user column prefs, drag-to-reschedule, and internal notes are live). Apply each new `migrations/NNNN_*.sql` in the SQL editor as it ships.
+- Migrations through **0039** are applied (permission management, team edit/deactivate, invites, permanent delete, per-user column prefs, drag-to-reschedule, and internal notes are live). **0040 (`set_client_status`) ships in this commit and still needs running** in the SQL editor before list archive/reactivate work against live. Apply each new `migrations/NNNN_*.sql` as it ships.
 - Email delivery is **live**: `notify-email` deployed + Database Webhook `notify_email_on_insert` on `notification` INSERT, sending via Resend (`mail.mood.mt`). Runbook: `supabase/functions/notify-email/DEPLOY.md`. (Notification emails only — **invite emails are not auto-sent yet**, see §19.)
 
 ### Environment
@@ -656,7 +659,7 @@ Then ensure a **Database Webhook** exists on `public.notification` (event INSERT
 - Planned tables: `notification` (built) and `notification_preference` (future).
 
 ### Recently completed (this development cycle)
-Client Approve/Request-changes UI · snapshot-on-send versioning · agency + client version history · agency dashboard · calendar filters · month-view media indicator · enriched notification copy · persisted media ordering + drag-reorder · real portal revocation · **combined all-clients calendar** · **per-client `calendar_colour` + legend** · **labelled asset links (0026)** · **RACI reference data (0027)** · **internal task list + dashboard summary (0028)** · sidebar logo · **legacy `asset` table dropped (0029)** · **per-client ownership + matrix (0030)** · **content↔task bridge + Lead-PM owner suggestion (0031)** · **admin area + editable RACI matrix (0032)** · **task List/Kanban/Calendar views + deeper dashboard breakdowns** · **permission management: Admin → Team access, promote/demote with last-admin lockout (0033)** · **team member edit + soft-deactivate/reactivate (0034)** · **agency + client invites, magic-link-native, accept-on-login (0035)** · **permanent delete: reassign-then-delete team members, guarded-cascade clients (0036)** · **per-user column preferences on the task list (0037)** · **drag-to-reschedule posts on the calendar, agency-only, with a past-date confirm (0038)** · **internal notes on posts + tasks, agency-only, author-owns, one polymorphic table (0039)**.
+Client Approve/Request-changes UI · snapshot-on-send versioning · agency + client version history · agency dashboard · calendar filters · month-view media indicator · enriched notification copy · persisted media ordering + drag-reorder · real portal revocation · **combined all-clients calendar** · **per-client `calendar_colour` + legend** · **labelled asset links (0026)** · **RACI reference data (0027)** · **internal task list + dashboard summary (0028)** · sidebar logo · **legacy `asset` table dropped (0029)** · **per-client ownership + matrix (0030)** · **content↔task bridge + Lead-PM owner suggestion (0031)** · **admin area + editable RACI matrix (0032)** · **task List/Kanban/Calendar views + deeper dashboard breakdowns** · **permission management: Admin → Team access, promote/demote with last-admin lockout (0033)** · **team member edit + soft-deactivate/reactivate (0034)** · **agency + client invites, magic-link-native, accept-on-login (0035)** · **permanent delete: reassign-then-delete team members, guarded-cascade clients (0036)** · **per-user column preferences on the task list (0037)** · **drag-to-reschedule posts on the calendar, agency-only, with a past-date confirm (0038)** · **internal notes on posts + tasks, agency-only, author-owns, one polymorphic table (0039)** · **archive / reactivate / delete actions in the clients list, with a lightweight `set_client_status` setter + type-the-name delete confirm (0040)**.
 
 ---
 
@@ -686,4 +689,4 @@ Client Approve/Request-changes UI · snapshot-on-send versioning · agency + cli
 
 ---
 
-*This document reflects the codebase at migration 0039. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*
+*This document reflects the codebase at migration 0040. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*
