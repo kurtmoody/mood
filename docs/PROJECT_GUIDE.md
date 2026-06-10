@@ -1,6 +1,6 @@
 # Mood — Project Guide
 
-**Status:** Internal build, actively developed. Last updated 2026-06-10 (migration 0038).
+**Status:** Internal build, actively developed. Last updated 2026-06-10 (migration 0039).
 **Audience:** Engineers, product managers, and anyone picking this project up at any point.
 **Scope of this document:** A complete reference for what Mood is, how it's built, and how to operate it. It is the single source of truth for architecture, the data/security model, every shipped feature, the full RPC and migration ledger, conventions, and the operational runbook.
 
@@ -24,7 +24,7 @@
 12. [Notifications (bell + email)](#12-notifications)
 13. [Feature inventory](#13-feature-inventory)
 14. [RPC reference](#14-rpc-reference)
-15. [Migration ledger (0001–0038)](#15-migration-ledger)
+15. [Migration ledger (0001–0039)](#15-migration-ledger)
 16. [Conventions & hard-won gotchas](#16-conventions--hard-won-gotchas)
 17. [Testing (pgTap)](#17-testing-pgtap)
 18. [Operational runbook](#18-operational-runbook)
@@ -191,6 +191,7 @@ Core tables are defined in `schema.sql`; later tables/columns are added by migra
 | `client_ownership` (1:1 with client, **agency-only**) | 0030 | `client_id` (PK → client **on delete cascade**) + eight nullable role slots → `team_member` (`lead_pm_id`, `comms_backup_id`, `creative_lead_id`, `design_owner_id`, `content_owner_id`, `video_owner_id`, `sales_ops_id`, `intern_support_id`), `updated_at`. Internal staffing — **no client branch**. Written via `set_client_ownership`. |
 | `invite` (agency + client scopes) | 0035 | `id`, `email` (stored **lower-cased**, no citext dep), `scope_type` (`agency`/`client`), `scope_id`, `role`, `status` (`pending`/`accepted`/`revoked`/`expired`, default pending), `invited_by`, `created_at`, `expires_at` (default now()+7d), `accepted_at`. Partial unique index `(email, scope_type, scope_id) where status='pending'` blocks duplicate live invites. RLS read = the `agency_admin` whose agency owns the scope; **no write policies** (RPC-only). |
 | `user_view_preference` (per-user UI prefs) | 0037 | PK `(user_id, view_key)`; `config` jsonb (ordered `[{key,hidden}]`), `updated_at`. `user_id → auth.users **on delete cascade**`. **Own-rows-only RLS** (`user_id = auth.uid()` for read + write) — the rare table a user writes for itself, still upserted via the `set_view_preference` RPC for consistency. Display-only personalisation, keyed by a `view_key` (e.g. `'tasks'`). |
+| `internal_note` (polymorphic, **agency-only**) | 0039 | `id`, `parent_type` (`post`/`task`, CHECK), `parent_id` (**no FK** — points at `content_item` or `task` by type), `author_id` (→ auth.users **on delete set null**), `body`, `created_at`, `updated_at` (null until edited); index `(parent_type, parent_id, created_at)`. One table backs notes on two parent kinds. **No client path.** RLS read resolves the parent's agency per-row via the `can_see_internal_note(parent_type, parent_id)` SECURITY DEFINER helper (`post → is_agency_for_client(client_id)`; `task → is_agency_member(agency_id)`); **no write policies** (RPC-only). |
 
 > The legacy `asset` table (original Drive-flavoured table, never used, superseded by `media` + `post_asset_link`) was **dropped in 0029** — it had a status-less read policy (a latent gap) and is gone from both the DB and `schema.sql`.
 
@@ -387,6 +388,7 @@ A **view-agnostic** mechanism for hide/show/reorder of table columns, shipped on
 - **Drag-to-reschedule (0038)** — **agency-only**: drag a post card onto another day (week or month view) to move it. The shift is **date-only, Malta-correct** — the post keeps its Malta-local time-of-day (`rescheduleToDateMalta`), never a UTC shift. Optimistic with revert-on-error (kanban pattern). Dropping on a **past day** opens a confirm that always confirms the move and offers **"Mark as posted"** only for eligible posts (`approved`/`scheduled`); the RPC re-checks so a draft/review post can never jump to posted. Clients get **no drag** (the home calendar is shared; the affordance is gated on `isAgency`). Uses `reschedule_content_item`, a dedicated path that does **not** fork a version.
 - **Approval workflow** (`transition_post`) — the state machine, every move logged, history timeline in the drawer.
 - **Comments** (`add_comment`/`delete_comment`).
+- **Internal notes (0039)** — **agency-only** notes on a post *and* on a task, from one polymorphic `internal_note` table and one reusable `InternalNotes` component mounted in two places: a distinct "Internal notes — not visible to the client" block in the post drawer (agency-only, visually separate from client Comments) and inside the task modal. Lists author + timestamp (with "edited"), an add box, and **edit/delete on the author's own notes only** (`add/update/delete_internal_note`). Errors surfaced. Clients never see them (pgTap leak-guard, below).
 - **Media** — upload, signed-URL display, drag-reorder, version-fork copy.
 - **Asset links (0026)** — labelled links per post in the drawer (`AssetLinksSection`), agency add/edit/delete/drag-reorder via server actions → RPCs; preset labels (Drive folder / Raw footage / Final exports / Other→free-text); clients read-only; a small link glyph on cards that have links.
 - **Calendar filters** (client-side, both views): status filter (role-gated options — clients never see `draft`), channel filter (from loaded posts), and a role-aware **"Needs my review"** toggle (agency → `internal_review`+`changes_requested`; client → `client_review`). "Showing N of M" + Clear. (The Clients filter, by contrast, is URL-driven because it scopes the server query.)
@@ -420,7 +422,7 @@ Data layer + emit (0019), enriched copy (0023), in-app bell, email Edge Function
 `/dashboard` (agency-only): a cross-client "needs attention" view aggregating `content_item` across **all** the agency's clients via RLS (no client filter). Sections — "Needs your action" (`internal_review`/`changes_requested`), "Awaiting client" (`client_review`, flagging items aged > 3 days), and a richer **task summary**: a prominent **overdue count** plus open-task breakdowns **By status** (→ `/tasks?status=`), **By owner** (→ `/tasks?owner=`), and **By client**. Each content row deep-links to the post. Read-only.
 
 ### Security (all pgTap-proven)
-Content read floor (0015), content tables RPC-only (0016), client transitions (0017), media table + storage policies (0018), notification RLS (0019), revoke (0020), versioning guards (0021), client version filter (0022), media reorder authorisation (0024), asset-link read floor + RPC auth (0026), task RLS + RPC auth (0028), client_ownership RLS + RPC auth (0030), RACI admin-write auth (0032), member-role admin-write + last-admin lockout (0033), team-member edit/deactivate auth (0034), invite create/accept auth incl. the client→agency leak guard (0035), permanent-delete auth + reassign/cascade + RACI merge (0036), view-preference own-rows RLS (0037), reschedule auth + mark-posted state-machine guard (0038).
+Content read floor (0015), content tables RPC-only (0016), client transitions (0017), media table + storage policies (0018), notification RLS (0019), revoke (0020), versioning guards (0021), client version filter (0022), media reorder authorisation (0024), asset-link read floor + RPC auth (0026), task RLS + RPC auth (0028), client_ownership RLS + RPC auth (0030), RACI admin-write auth (0032), member-role admin-write + last-admin lockout (0033), team-member edit/deactivate auth (0034), invite create/accept auth incl. the client→agency leak guard (0035), permanent-delete auth + reassign/cascade + RACI merge (0036), view-preference own-rows RLS (0037), reschedule auth + mark-posted state-machine guard (0038), internal-note RPC auth + per-row agency resolution incl. the **client-leak guard** (0039).
 
 ---
 
@@ -438,6 +440,15 @@ All RPCs are `SECURITY DEFINER` with `set search_path=''` and an `auth.uid()` nu
 | `add_comment` | `(item_id, body) → uuid` | member of the client | Emits comment notifications. |
 | `delete_comment` | `(comment_id) → void` | author or agency | |
 | `get_post_versions` | `(item_id) → setof (version_id, version_no, body, internal_note, created_by, created_at, is_current, events jsonb, media jsonb)` | agency = all; client = sent versions only | Per-version client filter on `approve_internal`; nulls `internal_note` for clients; media ordered by `sort_order`. |
+
+### Internal notes (0039)
+| RPC | Signature | Auth | Notes |
+|---|---|---|---|
+| `add_internal_note` | `(parent_type, parent_id, body) → uuid` | agency member of the parent's agency | Validates `parent_type`/body; resolves agency (post→client→agency; task→agency_id); inserts `author_id = auth.uid()`. |
+| `update_internal_note` | `(id, body) → void` | **author only** | Non-empty body; sets `updated_at`; raises if not found / not the author. |
+| `delete_internal_note` | `(id) → void` | **author only** | Raises if not found / not the author. |
+
+> Read access is the RLS policy via the `can_see_internal_note(parent_type, parent_id)` SECURITY DEFINER helper, not an RPC.
 
 ### Media
 | RPC | Signature | Auth | Notes |
@@ -556,6 +567,7 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 | 0036 | permanent_delete (+2 tests) | `delete_team_member` (reassign-then-delete) + `delete_client` (guarded cascade) — both admin-only + two-step. No table change. |
 | 0037 | view_preferences (+test) | `user_view_preference` table (own-rows-only RLS) + `set_view_preference` upsert RPC. Per-user column prefs. |
 | 0038 | reschedule_post (+test) | `reschedule_content_item` — agency-only date-only move (no version fork) + state-machine-guarded `mark_posted`. No table change. |
+| 0039 | internal_notes (+test) | `internal_note` polymorphic table (post/task, agency-only, no client path) + `can_see_internal_note` RLS helper + `add/update/delete_internal_note`. Client-leak guard pgTap-proven. |
 
 > `schema.sql` is the fresh-setup reference **only** — it has a destructive reset block at the top; **never run it against the live DB.** New changes go in a migration.
 
@@ -572,6 +584,7 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 - **ALL content writes go through SECURITY DEFINER RPCs.** No permissive write policies on content tables (an inline RLS `WITH CHECK` subquery on `membership` silently fails). Authorisation is inside each RPC.
 - **Storage:** private bucket; display via batched `createSignedUrls`; never `getPublicUrl`; `<img>` not `next/image`; upload path `<client_id>/<content_item_id>/<version_id>/<filename>`.
 - **Dates** are Europe/Malta, week starts Monday — use `lib/week.ts`; bucket posts by real date, never weekday. For a **date-only move** preserving time-of-day, use `rescheduleToDateMalta` (shifts by Malta wall-clock, not UTC) — never add/subtract on the UTC instant.
+- **Polymorphic tables have no FK safety net — resolve the parent's agency per-row (0039).** `internal_note.parent_id` points at either `content_item` or `task` by `parent_type`, so there's no foreign key to lean on. Both layers must resolve the parent's agency themselves and gate on membership: the **RLS read** via `can_see_internal_note(parent_type, parent_id)` (`post → is_agency_for_client(client_id)`; `task → is_agency_member(agency_id)`), and **every write RPC** by resolving `agency_id` from the parent before inserting. A missing parent resolves to null → the helpers return false → fails closed. The **client-leak guard** (a client cannot read internal notes on their own post) is pgTap-proven. If you add another polymorphic parent table, extend both the helper and the RPCs — don't assume an FK will catch a bad `parent_id`.
 - **Reschedule bypasses `update_post` on purpose (0038).** `update_post` **forks a new version and bounces frozen posts to `internal_review`** — correct for a body/title edit, catastrophic for a drag-to-reschedule (it would silently un-approve a post and spawn a spurious v2). Drag-to-reschedule therefore uses the dedicated `reschedule_content_item`, which only writes `scheduled_at` (+ optional `mark_posted`). Don't reroute it through `update_post`.
 - **Migrations are manual + idempotent.** Apply schema changes to live **before** pushing app code that depends on them.
 - **Enum columns — cast text to the enum in RPCs.** `membership.role` is `public.member_role` and `content_item.status` is `content_status` (both enums). An INSERT of a string *literal* coerces automatically, but assigning a text *variable/param* does not — `set role = p_role` fails with a type mismatch. Validate the value, then cast: `set role = p_role::public.member_role` (see `set_member_role`).
@@ -615,7 +628,7 @@ supabase functions deploy notify-email
 Then ensure a **Database Webhook** exists on `public.notification` (event INSERT) pointing at the function URL. Email needs the verified Resend domain (`mail.mood.mt`). The Edge change only takes effect after redeploy.
 
 ### Outstanding operational tasks (as of 2026-06-10)
-- Migrations through **0038** are applied (permission management, team edit/deactivate, invites, permanent delete, per-user column prefs, and drag-to-reschedule are live). Apply each new `migrations/NNNN_*.sql` in the SQL editor as it ships.
+- Migrations through **0039** are applied (permission management, team edit/deactivate, invites, permanent delete, per-user column prefs, drag-to-reschedule, and internal notes are live). Apply each new `migrations/NNNN_*.sql` in the SQL editor as it ships.
 - Email delivery is **live**: `notify-email` deployed + Database Webhook `notify_email_on_insert` on `notification` INSERT, sending via Resend (`mail.mood.mt`). Runbook: `supabase/functions/notify-email/DEPLOY.md`. (Notification emails only — **invite emails are not auto-sent yet**, see §19.)
 
 ### Environment
@@ -643,7 +656,7 @@ Then ensure a **Database Webhook** exists on `public.notification` (event INSERT
 - Planned tables: `notification` (built) and `notification_preference` (future).
 
 ### Recently completed (this development cycle)
-Client Approve/Request-changes UI · snapshot-on-send versioning · agency + client version history · agency dashboard · calendar filters · month-view media indicator · enriched notification copy · persisted media ordering + drag-reorder · real portal revocation · **combined all-clients calendar** · **per-client `calendar_colour` + legend** · **labelled asset links (0026)** · **RACI reference data (0027)** · **internal task list + dashboard summary (0028)** · sidebar logo · **legacy `asset` table dropped (0029)** · **per-client ownership + matrix (0030)** · **content↔task bridge + Lead-PM owner suggestion (0031)** · **admin area + editable RACI matrix (0032)** · **task List/Kanban/Calendar views + deeper dashboard breakdowns** · **permission management: Admin → Team access, promote/demote with last-admin lockout (0033)** · **team member edit + soft-deactivate/reactivate (0034)** · **agency + client invites, magic-link-native, accept-on-login (0035)** · **permanent delete: reassign-then-delete team members, guarded-cascade clients (0036)** · **per-user column preferences on the task list (0037)** · **drag-to-reschedule posts on the calendar, agency-only, with a past-date confirm (0038)**.
+Client Approve/Request-changes UI · snapshot-on-send versioning · agency + client version history · agency dashboard · calendar filters · month-view media indicator · enriched notification copy · persisted media ordering + drag-reorder · real portal revocation · **combined all-clients calendar** · **per-client `calendar_colour` + legend** · **labelled asset links (0026)** · **RACI reference data (0027)** · **internal task list + dashboard summary (0028)** · sidebar logo · **legacy `asset` table dropped (0029)** · **per-client ownership + matrix (0030)** · **content↔task bridge + Lead-PM owner suggestion (0031)** · **admin area + editable RACI matrix (0032)** · **task List/Kanban/Calendar views + deeper dashboard breakdowns** · **permission management: Admin → Team access, promote/demote with last-admin lockout (0033)** · **team member edit + soft-deactivate/reactivate (0034)** · **agency + client invites, magic-link-native, accept-on-login (0035)** · **permanent delete: reassign-then-delete team members, guarded-cascade clients (0036)** · **per-user column preferences on the task list (0037)** · **drag-to-reschedule posts on the calendar, agency-only, with a past-date confirm (0038)** · **internal notes on posts + tasks, agency-only, author-owns, one polymorphic table (0039)**.
 
 ---
 
@@ -673,4 +686,4 @@ Client Approve/Request-changes UI · snapshot-on-send versioning · agency + cli
 
 ---
 
-*This document reflects the codebase at migration 0038. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*
+*This document reflects the codebase at migration 0039. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*

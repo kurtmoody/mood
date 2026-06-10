@@ -8,6 +8,7 @@ import MediaSection from './MediaSection'
 import AssetLinksSection from './AssetLinksSection'
 import VersionHistory from './VersionHistory'
 import ClientVersionHistory from './ClientVersionHistory'
+import InternalNotes from './InternalNotes'
 
 type ActionState = { error: string | null; ok: boolean }
 type ActionFn = (prev: ActionState, fd: FormData) => Promise<ActionState>
@@ -413,6 +414,12 @@ export default function Drawer({
           {isAgency
             ? <VersionHistory versions={item.versions ?? []} />
             : <ClientVersionHistory itemId={item.id} />}
+
+          {isAgency && (
+            <div className="mt-7 pt-5 border-t border-[#ECECEE]">
+              <InternalNotes parentType="post" parentId={item.id} currentUserId={currentUserId} />
+            </div>
+          )}
 
           <div className="mt-7 pt-5 border-t border-[#ECECEE]">
             <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-3">Comments</div>

@@ -11,6 +11,7 @@ import { fmtTaskDate, taskToday, taskToInput, type Task, type Member, type Clien
 import { TASK_COLUMNS, TASK_VIEW_KEY } from './columns'
 import { mergeColumns, toConfig, type ColumnConfig, type ResolvedColumn } from '@/lib/viewColumns'
 import ColumnPicker from '@/components/ColumnPicker'
+import InternalNotes from '@/components/InternalNotes'
 import TaskKanban from './TaskKanban'
 import TaskCalendar from './TaskCalendar'
 
@@ -76,13 +77,14 @@ function taskCell(key: string, t: Task) {
   }
 }
 
-function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, onClose, onSaved }: {
+function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, currentUserId, onClose, onSaved }: {
   task: Task | null
   seed?: Partial<TaskInput>
   servesLabel: string | null
   members: Member[]
   clients: ClientOpt[]
   leadPmByClient: Record<string, string | null>
+  currentUserId: string
   onClose: () => void
   onSaved: () => void
 }) {
@@ -163,6 +165,11 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
             <textarea value={form.notes ?? ''} onChange={(e) => set('notes', e.target.value || null)} rows={2} className={fieldCls} />
           </div>
         </div>
+        {task && (
+          <div className="mt-4">
+            <InternalNotes parentType="task" parentId={task.id} currentUserId={currentUserId} />
+          </div>
+        )}
         {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
         <div className="flex items-center gap-2 mt-4">
           <button onClick={submit} disabled={pending} className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 cursor-pointer">
@@ -366,6 +373,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
           members={teamMembers}
           clients={clients}
           leadPmByClient={leadPmByClient}
+          currentUserId={currentUserId}
           onClose={() => setModal({ open: false, task: null, servesLabel: null })}
           onSaved={() => setModal({ open: false, task: null, servesLabel: null })}
         />
