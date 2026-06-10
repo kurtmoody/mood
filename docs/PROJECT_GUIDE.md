@@ -1,6 +1,6 @@
 # Mood — Project Guide
 
-**Status:** Internal build, actively developed. Last updated 2026-06-10 (migration 0040).
+**Status:** Internal build, actively developed. Last updated 2026-06-10 (migration 0042).
 **Audience:** Engineers, product managers, and anyone picking this project up at any point.
 **Scope of this document:** A complete reference for what Mood is, how it's built, and how to operate it. It is the single source of truth for architecture, the data/security model, every shipped feature, the full RPC and migration ledger, conventions, and the operational runbook.
 
@@ -24,7 +24,7 @@
 12. [Notifications (bell + email)](#12-notifications)
 13. [Feature inventory](#13-feature-inventory)
 14. [RPC reference](#14-rpc-reference)
-15. [Migration ledger (0001–0040)](#15-migration-ledger)
+15. [Migration ledger (0001–0042)](#15-migration-ledger)
 16. [Conventions & hard-won gotchas](#16-conventions--hard-won-gotchas)
 17. [Testing (pgTap)](#17-testing-pgtap)
 18. [Operational runbook](#18-operational-runbook)
@@ -148,7 +148,7 @@ lib/
   ownershipRoles.ts                                   # OWNERSHIP_ROLES (the 8 client_ownership role slots)
   viewColumns.ts                                      # ColumnDef/ColumnConfig + mergeColumns (column-pref mechanism)
 
-migrations/                       # numbered SQL (0001–0037) + pgTap *_test.sql
+migrations/                       # numbered SQL (0001–0042) + pgTap *_test.sql
 proxy.ts                          # Next 16 middleware → updateSession
 schema.sql                        # fresh-setup reference (DESTRUCTIVE reset block — never run on live)
 supabase/functions/notify-email/index.ts   # Deno Edge Function: notification → Resend email
@@ -168,7 +168,7 @@ Core tables are defined in `schema.sql`; later tables/columns are added by migra
 | `client` | A client of the agency | `id`, `agency_id`, `name`, `status` (prospect/active/paused/archived), `website`, `industry`, `current`… |
 | `membership` | user ↔ scope, with role | `user_id`, `scope_type` (`agency`/`client`), `scope_id`, `role` — the Postgres **enum `public.member_role`** (`agency_admin`/`agency_member`/`client_approver`/`client_viewer`), so role values are DB-constrained (hence `set_member_role` casts `p_role::public.member_role`). |
 | `channel` | A publishing channel per client | `id`, `client_id`, `type` (instagram/facebook/linkedin/blog/newsletter), `label` |
-| `content_item` | A planned post | `id`, `client_id`, `channel_id`, `title`, `content_type`, `scheduled_at`, `status`, `current_version_id` (→ content_version, FK added 0021), `created_by`, `updated_at` |
+| `content_item` | A planned post | `id`, `client_id`, `channel_id`, `title`, `content_type`, `scheduled_at`, `status`, `current_version_id` (→ content_version, FK added 0021), `created_by`, `updated_at`. **Production metadata (0042):** `designer_id` (→ team_member **on delete set null** — directory ref, login not required), `design_status`, `drive_url`, `high_res_url`, `boost` (bool, default false), `ad_budget` (numeric), `date_posted` (date), `posted_url`. Written via `set_post_meta`, **never** `update_post` (see §16). |
 | `content_version` | Versioned body of a post | `id`, `content_item_id`, `version_no` (unique per item, `uq_version_no` 0021), `body`, `internal_note`, `created_by`, `created_at` |
 | `comment` | A comment on a post | `id`, `content_item_id`, `author_id`, `body`, `created_at` |
 | `approval_event` | Audit log of every transition | `id`, `content_item_id`, `version_id`, `actor_id`, `action`, `note`, `created_at` |
@@ -385,6 +385,7 @@ A **view-agnostic** mechanism for hide/show/reorder of table columns, shipped on
 - **Combined all-clients view (default for agency).** The home calendar shows **every client's posts together** rather than one client (`clientList[0]`). The single-client dropdown is replaced by a **Clients multi-select** (reuse of `FilterMenu`), **URL-persisted via `?clients=`** (comma list); the query is `.in('client_id', selectedClientIds)`. A single-client deep-link (`?client=`) still focuses one. Clients only ever see their own.
 - **Per-client colour.** Each post card/chip is **filled with its client's `calendar_colour`** (text colour auto-chosen by luminance, `lib/colour.ts`), with the workflow **status as a dot**. A **colour→client legend** shows in combined view. Null-colour clients get a stable palette fallback at render.
 - **Create/edit posts** (`create_post`/`update_post`) — body versioned; status-aware editing (in-place vs fork).
+- **Content grid (0042)** — a third content-page view (`?view=grid`, **agency-only**, alongside Week/Month) — a dense, Monday-style **production tracker**: posts **grouped by client** with the production fields as columns (Designer, Design status, Boost, Ad budget, Drive / High-res / Posted links, Date posted; Status + Posted Yes/No + PM read-only). **One source of truth** — it renders the *same* `filtered` posts as the calendar (month-scoped via the existing windowed query; no parallel fetch) and inherits the agency archived filter. **Metadata cells are inline-editable** (save-on-blur/change, optimistic, revert-on-error) via `set_post_meta`; **status/title/date are read-only** (changed through the drawer/approval flow); the row title opens the existing `Drawer`. The same fields are also editable in the drawer's **Production details** section. Production metadata edits use `set_post_meta`, which **does not fork a version or change status**.
 - **Drag-to-reschedule (0038)** — **agency-only**: drag a post card onto another day (week or month view) to move it. The shift is **date-only, Malta-correct** — the post keeps its Malta-local time-of-day (`rescheduleToDateMalta`), never a UTC shift. Optimistic with revert-on-error (kanban pattern). Dropping on a **past day** opens a confirm that always confirms the move and offers **"Mark as posted"** only for eligible posts (`approved`/`scheduled`); the RPC re-checks so a draft/review post can never jump to posted. Clients get **no drag** (the home calendar is shared; the affordance is gated on `isAgency`). Uses `reschedule_content_item`, a dedicated path that does **not** fork a version.
 - **Approval workflow** (`transition_post`) — the state machine, every move logged, history timeline in the drawer.
 - **Comments** (`add_comment`/`delete_comment`).
@@ -436,6 +437,7 @@ All RPCs are `SECURITY DEFINER` with `set search_path=''` and an `auth.uid()` nu
 | `create_post` | `(client_id, channel_id?, title?, content_type?, scheduled_at?, body?) → uuid` | agency-for-client | Creates the item + v1, sets `current_version_id`. |
 | `update_post` | `(item_id, title, channel_id, scheduled_at, body) → jsonb` | agency-for-client | In-place for mutable statuses; **forks v2** for frozen statuses, returns `[{old_path,new_path}]` media pairs. |
 | `reschedule_content_item` | `(id, scheduled_at, mark_posted=false) → void` | agency-for-client (no client path) | Date-only move (drag-to-reschedule). **Never forks** — unlike `update_post`. `mark_posted` → `posted` **only** from `approved`/`scheduled`, else ignored. |
+| `set_post_meta` (0042) | `(id, designer_id?, design_status?, drive_url?, high_res_url?, boost=false, ad_budget?, date_posted?, posted_url?) → void` | agency-for-client (no client path) | Production-metadata setter for the content grid / drawer Production details. **No version fork, no status change.** Validates `designer_id` is a team member of the post's agency. **Full overwrite** of all metadata columns (see §16). |
 | `transition_post` | `(item_id, action, note?) → text` | agency any; client only `approve`/`request_changes` from `client_review` | State machine, logs `approval_event`, emits notifications. |
 | `add_comment` | `(item_id, body) → uuid` | member of the client | Emits comment notifications. |
 | `delete_comment` | `(comment_id) → void` | author or agency | |
@@ -570,6 +572,8 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 | 0038 | reschedule_post (+test) | `reschedule_content_item` — agency-only date-only move (no version fork) + state-machine-guarded `mark_posted`. No table change. |
 | 0039 | internal_notes (+test) | `internal_note` polymorphic table (post/task, agency-only, no client path) + `can_see_internal_note` RLS helper + `add/update/delete_internal_note`. Client-leak guard pgTap-proven. |
 | 0040 | set_client_status (+test) | `set_client_status` — lightweight agency-authorised archive/reactivate (validates the status value). No table change. |
+| 0041 | task_subscriptions (+test) | `task_subscriber` table + `notification.email`/`task_id` columns; RACI-seeded subscriptions (owner/accountable/creator) + task event notifications via `create_task`/`update_task` + `_notify_task`. *(Fuller writeup pending — see RPC/feature sections for content-grid; tasks-notification detail still to be folded in.)* |
+| 0042 | post_production_meta (+test) | Production-metadata columns on `content_item` (designer_id, design_status, drive/high-res/posted urls, boost, ad_budget, date_posted) + `set_post_meta` — no-fork, full-overwrite, agency-only setter. Backs the content grid + drawer Production details. |
 
 > `schema.sql` is the fresh-setup reference **only** — it has a destructive reset block at the top; **never run it against the live DB.** New changes go in a migration.
 
@@ -589,6 +593,7 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 - **Change client status via `set_client_status`, not `update_client` (0040).** Status changes (archive/reactivate) go through the lightweight `set_client_status(client_id, status)` RPC, which writes only `status`. The heavy `update_client` resends every field, and its status write (`status = coalesce(p_status,'active')`) **exhibited a status-revert this session** — saving "Archived" via the edit form came back as "Active". The clients-list archive/reactivate actions deliberately use `set_client_status` and are unaffected. ⚠️ The edit-form path through `update_client` was **not** changed in this slice, so until that revert is root-caused, treat `set_client_status` as the reliable way to set status and don't reroute archiving through `update_client`.
 - **Polymorphic tables have no FK safety net — resolve the parent's agency per-row (0039).** `internal_note.parent_id` points at either `content_item` or `task` by `parent_type`, so there's no foreign key to lean on. Both layers must resolve the parent's agency themselves and gate on membership: the **RLS read** via `can_see_internal_note(parent_type, parent_id)` (`post → is_agency_for_client(client_id)`; `task → is_agency_member(agency_id)`), and **every write RPC** by resolving `agency_id` from the parent before inserting. A missing parent resolves to null → the helpers return false → fails closed. The **client-leak guard** (a client cannot read internal notes on their own post) is pgTap-proven. If you add another polymorphic parent table, extend both the helper and the RPCs — don't assume an FK will catch a bad `parent_id`.
 - **Reschedule bypasses `update_post` on purpose (0038).** `update_post` **forks a new version and bounces frozen posts to `internal_review`** — correct for a body/title edit, catastrophic for a drag-to-reschedule (it would silently un-approve a post and spawn a spurious v2). Drag-to-reschedule therefore uses the dedicated `reschedule_content_item`, which only writes `scheduled_at` (+ optional `mark_posted`). Don't reroute it through `update_post`.
+- **`set_post_meta` is a full-overwrite of all metadata columns → last-write-wins (0042).** It writes every production-metadata column on each call (the content-grid cells can't send a partial patch and have the rest preserved), so the caller must always send the row's *complete* current metadata — the grid/drawer hold per-row state and do exactly this. The consequence: **concurrent edits to the same post's metadata are last-write-wins at the row level** — if two people edit different cells of the same post at the same time, the later save overwrites the earlier with its (stale) values for the other cells. This is a **known, accepted limitation at current team scale**; if it becomes a problem, move to per-column setters or column-level merge. (Like `reschedule_content_item`, `set_post_meta` does **not** fork a version or change status.)
 - **Migrations are manual + idempotent.** Apply schema changes to live **before** pushing app code that depends on them.
 - **Enum columns — cast text to the enum in RPCs.** `membership.role` is `public.member_role` and `content_item.status` is `content_status` (both enums). An INSERT of a string *literal* coerces automatically, but assigning a text *variable/param* does not — `set role = p_role` fails with a type mismatch. Validate the value, then cast: `set role = p_role::public.member_role` (see `set_member_role`).
 - **PostgREST embed ambiguity (PGRST201).** When **two FKs** connect the same pair of tables, an unqualified embed (`versions:content_version(...)`) becomes ambiguous and the whole query errors. This bit us when 0021 added `content_item.current_version_id → content_version` alongside the existing `content_version.content_item_id → content_item`: the calendar query now **must** name the FK — `versions:content_version!content_version_content_item_id_fkey(...)`. Single-FK embeds (e.g. `post_asset_link`, `task.client_id`, `task.owner_id`) need no hint. If you add an FK between two already-related tables, disambiguate their embeds.
@@ -689,4 +694,4 @@ Client Approve/Request-changes UI · snapshot-on-send versioning · agency + cli
 
 ---
 
-*This document reflects the codebase at migration 0040. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*
+*This document reflects the codebase at migration 0042. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list. (Note: 0041 task-subscriptions has a ledger entry but still needs a fuller §12/§14 writeup.)*
