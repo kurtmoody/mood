@@ -57,6 +57,42 @@ export async function reschedulePostAction(
   return { error: null }
 }
 
+// Production metadata (Drive links, design sub-status, boost/budget, posted date,
+// designer) — written via the lightweight set_post_meta RPC so it NEVER forks a version
+// or changes the approval status. Direct-call (no form); agency-only enforced in the RPC.
+export async function setPostMetaAction(
+  itemId: string,
+  meta: {
+    designer_id: string | null
+    design_status: string | null
+    drive_url: string | null
+    high_res_url: string | null
+    boost: boolean
+    ad_budget: number | null
+    date_posted: string | null
+    posted_url: string | null
+  },
+): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not signed in.' }
+
+  const { error } = await supabase.rpc('set_post_meta', {
+    p_id: itemId,
+    p_designer_id: meta.designer_id,
+    p_design_status: meta.design_status,
+    p_drive_url: meta.drive_url,
+    p_high_res_url: meta.high_res_url,
+    p_boost: meta.boost,
+    p_ad_budget: meta.ad_budget,
+    p_date_posted: meta.date_posted,
+    p_posted_url: meta.posted_url,
+  })
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  return { error: null }
+}
+
 export async function updatePostAction(_prev: PostState, fd: FormData): Promise<PostState> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

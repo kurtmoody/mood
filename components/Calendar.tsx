@@ -74,6 +74,15 @@ export type Item = {
   archived?: boolean
   asset_links?: AssetLink[]
   tasks?: LinkedTask[]
+  // Production metadata (0042) — edited in the drawer's Production details section.
+  designer_id?: string | null
+  design_status?: string | null
+  drive_url?: string | null
+  high_res_url?: string | null
+  boost?: boolean | null
+  ad_budget?: number | null
+  date_posted?: string | null
+  posted_url?: string | null
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']

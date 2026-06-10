@@ -9,6 +9,7 @@ import AssetLinksSection from './AssetLinksSection'
 import VersionHistory from './VersionHistory'
 import ClientVersionHistory from './ClientVersionHistory'
 import InternalNotes from './InternalNotes'
+import ProductionDetails from './ProductionDetails'
 
 type ActionState = { error: string | null; ok: boolean }
 type ActionFn = (prev: ActionState, fd: FormData) => Promise<ActionState>
@@ -414,6 +415,8 @@ export default function Drawer({
           {isAgency
             ? <VersionHistory versions={item.versions ?? []} />
             : <ClientVersionHistory itemId={item.id} />}
+
+          {isAgency && <ProductionDetails item={item} clientId={item.client_id} />}
 
           {isAgency && (
             <div className="mt-7 pt-5 border-t border-[#ECECEE]">
