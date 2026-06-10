@@ -59,3 +59,24 @@ export async function updateClientAction(
   revalidatePath(`/clients/${clientId}`)
   return { error: null, ok: true }
 }
+
+// Permanent (hard) delete of a client and all its dependent data. Admin-only +
+// two-step (must be paused/archived) enforced inside the RPC. Redirects to the list.
+export async function deleteClientAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const clientId = (formData.get('client_id') as string | null)?.trim()
+  if (!clientId) return { error: 'Missing client id.', ok: false }
+
+  const { error } = await supabase.rpc('delete_client', { p_id: clientId })
+  if (error) return { error: error.message, ok: false }
+
+  revalidatePath('/clients')
+  redirect('/clients')
+}

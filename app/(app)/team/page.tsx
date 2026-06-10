@@ -19,9 +19,10 @@ export default async function TeamPage() {
 
   const { data: agencyMemberships } = await supabase
     .from('membership')
-    .select('scope_id')
+    .select('scope_id, role')
     .eq('scope_type', 'agency')
   if (!agencyMemberships?.length) redirect('/')
+  const isAdmin = agencyMemberships.some((m) => m.role === 'agency_admin')
 
   const { data: members } = await supabase
     .from('team_member')
@@ -52,7 +53,7 @@ export default async function TeamPage() {
             <div className="text-sm text-[#5A5E66]">Add your agency&apos;s staff below.</div>
           </div>
         ) : (
-          <TeamList members={list} />
+          <TeamList members={list} isAdmin={isAdmin} />
         )}
 
         <AddTeamMemberForm />

@@ -5,6 +5,7 @@ import ChannelsSection, { type Channel } from './ChannelsSection'
 import ContactsSection, { type Contact } from './ContactsSection'
 import BrandAssetsSection, { type BrandAsset } from './BrandAssetsSection'
 import OwnershipSection from './OwnershipSection'
+import DeleteClientSection from './DeleteClientSection'
 import InvitePanel, { type Invite } from '../../InvitePanel'
 import type { ClientDefaults, TeamOption } from '../ClientFormFields'
 import type { Ownership } from '@/lib/ownershipRoles'
@@ -29,9 +30,10 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
 
   const { data: agencyMemberships } = await supabase
     .from('membership')
-    .select('scope_id')
+    .select('scope_id, role')
     .eq('scope_type', 'agency')
   if (!agencyMemberships?.length) redirect('/')
+  const isAdmin = agencyMemberships.some((m) => m.role === 'agency_admin')
 
   const { data: client } = await supabase
     .from('client')
@@ -138,6 +140,12 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
           invites={(invites as Invite[] | null) ?? []}
         />
       </div>
+
+      {isAdmin && client.status === 'archived' && (
+        <div className="max-w-[680px] mt-10">
+          <DeleteClientSection clientId={client.id} clientName={client.name} />
+        </div>
+      )}
     </>
   )
 }

@@ -92,3 +92,31 @@ export async function setTeamMemberActiveAction(
   revalidatePath('/team')
   return { error: null, ok: true }
 }
+
+// Permanent (hard) delete: reassigns the member's tasks/ownership/RACI to a successor,
+// then removes the directory row. Admin-only + two-step enforced inside the RPC.
+export async function deleteTeamMemberAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const id = (formData.get('id') as string | null)?.trim()
+  if (!id) return { error: 'Missing member id.', ok: false }
+
+  const successor = (formData.get('successor_id') as string | null)?.trim()
+  if (!successor) return { error: 'Choose who inherits their work.', ok: false }
+
+  const { error } = await supabase.rpc('delete_team_member', {
+    p_id: id,
+    p_successor_id: successor,
+  })
+
+  if (error) return { error: error.message, ok: false }
+
+  revalidatePath('/team')
+  return { error: null, ok: true }
+}

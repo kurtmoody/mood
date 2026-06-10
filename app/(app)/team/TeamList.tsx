@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from 'react'
 import {
   updateTeamMemberAction,
   setTeamMemberActiveAction,
+  deleteTeamMemberAction,
   type FormState,
 } from './actions'
 
@@ -21,12 +22,14 @@ const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg
 const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
 const gridCls = 'grid grid-cols-[1.4fr_1fr_1.4fr_auto_auto] gap-4 px-5 items-center'
 
-export default function TeamList({ members }: { members: Member[] }) {
+export default function TeamList({ members, isAdmin }: { members: Member[]; isAdmin: boolean }) {
   const [filter, setFilter] = useState<'active' | 'all'>('active')
   const [editing, setEditing] = useState<Member | null>(null)
+  const [deleting, setDeleting] = useState<Member | null>(null)
 
   const visible = filter === 'active' ? members.filter((m) => m.is_active) : members
   const inactiveCount = members.filter((m) => !m.is_active).length
+  const activeMembers = members.filter((m) => m.is_active)
 
   return (
     <div className="border border-[#ECECEE] rounded-2xl bg-white overflow-hidden">
@@ -60,16 +63,29 @@ export default function TeamList({ members }: { members: Member[] }) {
         <div className="px-5 py-8 text-center text-sm text-[#5A5E66]">No members to show.</div>
       ) : (
         visible.map((m) => (
-          <Row key={m.id} m={m} onEdit={() => setEditing(m)} />
+          <Row
+            key={m.id}
+            m={m}
+            isAdmin={isAdmin}
+            onEdit={() => setEditing(m)}
+            onDelete={() => setDeleting(m)}
+          />
         ))
       )}
 
       {editing && <EditModal member={editing} onClose={() => setEditing(null)} />}
+      {deleting && (
+        <DeleteModal
+          member={deleting}
+          successors={activeMembers.filter((m) => m.id !== deleting.id)}
+          onClose={() => setDeleting(null)}
+        />
+      )}
     </div>
   )
 }
 
-function Row({ m, onEdit }: { m: Member; onEdit: () => void }) {
+function Row({ m, isAdmin, onEdit, onDelete }: { m: Member; isAdmin: boolean; onEdit: () => void; onDelete: () => void }) {
   const [state, action, pending] = useActionState(setTeamMemberActiveAction, initial)
 
   const confirmDeactivate = (e: React.FormEvent) => {
@@ -109,8 +125,70 @@ function Row({ m, onEdit }: { m: Member; onEdit: () => void }) {
             {m.is_active ? 'Deactivate' : 'Reactivate'}
           </button>
         </form>
+        {isAdmin && !m.is_active && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="text-sm text-red-600 border border-red-200 rounded-lg px-3 py-1.5 font-medium hover:bg-red-50"
+          >
+            Delete permanently
+          </button>
+        )}
       </div>
       {state.error && <div className="col-span-5 text-sm text-red-600 pt-2">{state.error}</div>}
+    </div>
+  )
+}
+
+function DeleteModal({
+  member,
+  successors,
+  onClose,
+}: {
+  member: Member
+  successors: Member[]
+  onClose: () => void
+}) {
+  const [state, action, pending] = useActionState(deleteTeamMemberAction, initial)
+
+  useEffect(() => {
+    if (state.ok) onClose()
+  }, [state.ok, onClose])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="text-sm font-semibold mb-2">Delete {member.full_name} permanently</div>
+        <p className="text-sm text-[#5A5E66] mb-4">
+          This permanently deletes {member.full_name} and reassigns their tasks, ownership and RACI to the chosen
+          person. This cannot be undone.
+        </p>
+        {successors.length === 0 ? (
+          <p className="text-sm text-red-600">
+            There is no other active member to inherit their work. Add or reactivate someone first.
+          </p>
+        ) : (
+          <form action={action} className="flex flex-col gap-3">
+            <input type="hidden" name="id" value={member.id} />
+            <div>
+              <label htmlFor="successor_id" className={labelCls}>Reassign their work to</label>
+              <select id="successor_id" name="successor_id" required defaultValue="" className={fieldCls}>
+                <option value="" disabled>Choose a successor…</option>
+                {successors.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+              </select>
+            </div>
+            {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button type="button" onClick={onClose} className="text-sm text-[#5A5E66] rounded-lg px-4 py-2 font-medium hover:bg-[#FBFBFC]">
+                Cancel
+              </button>
+              <button type="submit" disabled={pending} className="bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                {pending ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   )
 }
