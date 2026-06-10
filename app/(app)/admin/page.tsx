@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import PageContainer from '@/components/PageContainer'
 
 // Add future admin modules (task templates, …) by appending here.
 const SECTIONS = [
@@ -9,7 +10,7 @@ const SECTIONS = [
 
 export default function AdminPage() {
   return (
-    <div className="max-w-3xl mx-auto">
+    <PageContainer variant="narrow">
       <h1 className="text-2xl font-bold">Admin</h1>
       <p className="text-sm text-[#9398A1] mt-1 mb-8">Agency configuration. Admin-only.</p>
 
@@ -25,6 +26,6 @@ export default function AdminPage() {
           </Link>
         ))}
       </div>
-    </div>
+    </PageContainer>
   )
 }

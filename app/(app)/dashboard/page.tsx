@@ -6,6 +6,7 @@ import { mondayOf, maltaDate, todayMalta } from '@/lib/week'
 import { STATUS_COLOUR, OPEN_STATUSES } from '@/lib/taskConstants'
 import { computeCapacity, rangeWeeks } from '@/lib/capacity'
 import CapacityPlanner from '@/components/CapacityPlanner'
+import PageContainer from '@/components/PageContainer'
 
 // Statuses that need attention. Deliberately excludes draft (still being worked) and
 // approved/scheduled/posted (done).
@@ -138,7 +139,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const clientRows = [...clientMap.values()].sort((a, b) => b.count - a.count)
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <PageContainer>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -210,7 +211,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </section>
 
       <CapacityPlanner model={capModel} n={capWeeks} archived={showArchived} mode={capMode} />
-    </div>
+    </PageContainer>
   )
 }
 

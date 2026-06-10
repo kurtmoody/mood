@@ -8,6 +8,7 @@ import OwnershipSection from './OwnershipSection'
 import DeleteClientSection from './DeleteClientSection'
 import TimesheetEnableToggle from './TimesheetEnableToggle'
 import TimesheetSection from '@/components/TimesheetSection'
+import PageContainer from '@/components/PageContainer'
 import InvitePanel, { type Invite } from '../../InvitePanel'
 import type { ClientDefaults, TeamOption } from '../ClientFormFields'
 import type { Ownership } from '@/lib/ownershipRoles'
@@ -107,7 +108,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
   }
 
   return (
-    <>
+    <PageContainer variant="narrow">
       <div className="mb-5">
         <div className="text-xl font-bold">{client.name}</div>
         <div className="text-sm text-[#5A5E66]">Edit client</div>
@@ -155,6 +156,6 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
           <DeleteClientSection clientId={client.id} clientName={client.name} />
         </div>
       )}
-    </>
+    </PageContainer>
   )
 }

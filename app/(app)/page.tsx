@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getAccess } from '@/lib/access'
 import { clientColour, fallbackColour } from '@/lib/colour'
 import CalendarBoard from './CalendarBoard'
+import PageContainer from '@/components/PageContainer'
 import {
   addDays,
   isDateStr,
@@ -184,20 +185,22 @@ export default async function Home({
   }
 
   return (
-    <CalendarBoard
-      clients={clientList.map((c) => ({ id: c.id, name: c.name, colour: clientColour(c), archived: isAgency && c.status === 'archived' }))}
-      selectedClientIds={selectedClientIds}
-      defaultClientId={selectedClientIds[0] ?? visibleIds[0]}
-      channelsByClient={channelsByClient}
-      posts={posts}
-      view={view}
-      monday={monday}
-      month={month}
-      todayStr={todayStr}
-      currentUserId={access.userId}
-      isAgency={isAgency}
-      openPostId={postParam ?? null}
-      loadError={!!error}
-    />
+    <PageContainer>
+      <CalendarBoard
+        clients={clientList.map((c) => ({ id: c.id, name: c.name, colour: clientColour(c), archived: isAgency && c.status === 'archived' }))}
+        selectedClientIds={selectedClientIds}
+        defaultClientId={selectedClientIds[0] ?? visibleIds[0]}
+        channelsByClient={channelsByClient}
+        posts={posts}
+        view={view}
+        monday={monday}
+        month={month}
+        todayStr={todayStr}
+        currentUserId={access.userId}
+        isAgency={isAgency}
+        openPostId={postParam ?? null}
+        loadError={!!error}
+      />
+    </PageContainer>
   )
 }

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { OWNERSHIP_ROLES, type Ownership } from '@/lib/ownershipRoles'
+import PageContainer from '@/components/PageContainer'
 
 export default async function OwnershipMatrixPage() {
   const supabase = await createClient()
@@ -26,7 +27,7 @@ export default async function OwnershipMatrixPage() {
   const rows = (clients as { id: string; name: string }[] | null) ?? []
 
   return (
-    <>
+    <PageContainer>
       <div className="flex items-center justify-between mb-5">
         <div>
           <div className="text-xl font-bold">Client ownership</div>
@@ -70,6 +71,6 @@ export default async function OwnershipMatrixPage() {
           </table>
         </div>
       )}
-    </>
+    </PageContainer>
   )
 }

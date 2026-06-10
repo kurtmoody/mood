@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AddTeamMemberForm from './AddTeamMemberForm'
 import TeamList, { type Member } from './TeamList'
+import PageContainer from '@/components/PageContainer'
 
 type Row = {
   id: string
@@ -40,7 +41,7 @@ export default async function TeamPage() {
   }))
 
   return (
-    <>
+    <PageContainer>
       <div className="mb-5">
         <div className="text-xl font-bold">Team</div>
         <div className="text-sm text-[#5A5E66]">{rows.length} {rows.length === 1 ? 'member' : 'members'}</div>
@@ -58,6 +59,6 @@ export default async function TeamPage() {
 
         <AddTeamMemberForm />
       </div>
-    </>
+    </PageContainer>
   )
 }

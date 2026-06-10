@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getAccess } from '@/lib/access'
 import AccessEditor, { type AccessMember } from './AccessEditor'
 import InvitePanel, { type Invite } from '../../InvitePanel'
+import PageContainer from '@/components/PageContainer'
 
 export default async function AccessPage() {
   const supabase = await createClient()
@@ -25,7 +26,7 @@ export default async function AccessPage() {
     .order('created_at', { ascending: false })
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <PageContainer variant="narrow">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-bold">Team access</h1>
         <Link href="/admin" className="text-sm text-[#5A5E66] hover:underline">← Admin</Link>
@@ -49,6 +50,6 @@ export default async function AccessPage() {
           invites={(invites as Invite[] | null) ?? []}
         />
       </div>
-    </div>
+    </PageContainer>
   )
 }

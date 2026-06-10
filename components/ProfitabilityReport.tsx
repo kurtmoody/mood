@@ -28,7 +28,7 @@ export default function ProfitabilityReport({ model, range }: { model: ProfitMod
   const href = (p: Preset) => `/reports?range=${p}`
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div>
       <h1 className="text-2xl font-bold">Profitability</h1>
       <p className="text-sm text-[#9398A1] mt-1 mb-5">Per-job value, time-cost and margin. Admin-only.</p>
 

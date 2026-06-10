@@ -4,6 +4,7 @@ import { getAccess } from '@/lib/access'
 import { clientColour } from '@/lib/colour'
 import { mondayOf, maltaDate } from '@/lib/week'
 import TasksBoard from './TasksBoard'
+import PageContainer from '@/components/PageContainer'
 
 function postHref(p: { id: string; client_id: string | null; scheduled_at: string | null }) {
   if (!p.client_id) return null
@@ -75,19 +76,21 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const initialView = view === 'kanban' || view === 'calendar' ? view : 'list'
 
   return (
-    <TasksBoard
-      tasks={rows}
-      teamMembers={(team ?? []).map((m: any) => ({ id: m.id, full_name: m.full_name, user_id: m.user_id }))}
-      clients={(clients ?? []).map((c: any) => ({ id: c.id, name: c.name, colour: clientColour(c) }))}
-      leadPmByClient={leadPmByClient}
-      currentUserId={access.userId}
-      loadError={!!error}
-      prefill={prefill}
-      initialView={initialView}
-      initialOwner={owner ?? ''}
-      initialStatus={status ?? ''}
-      initialClient={client ?? ''}
-      savedColumns={(viewPref?.config as { key: string; hidden: boolean }[] | null) ?? null}
-    />
+    <PageContainer>
+      <TasksBoard
+        tasks={rows}
+        teamMembers={(team ?? []).map((m: any) => ({ id: m.id, full_name: m.full_name, user_id: m.user_id }))}
+        clients={(clients ?? []).map((c: any) => ({ id: c.id, name: c.name, colour: clientColour(c) }))}
+        leadPmByClient={leadPmByClient}
+        currentUserId={access.userId}
+        loadError={!!error}
+        prefill={prefill}
+        initialView={initialView}
+        initialOwner={owner ?? ''}
+        initialStatus={status ?? ''}
+        initialClient={client ?? ''}
+        savedColumns={(viewPref?.config as { key: string; hidden: boolean }[] | null) ?? null}
+      />
+    </PageContainer>
   )
 }

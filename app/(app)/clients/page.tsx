@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ClientsTable, { type Client } from './ClientsTable'
+import PageContainer from '@/components/PageContainer'
 
 export default async function ClientsPage() {
   const supabase = await createClient()
@@ -27,7 +28,7 @@ export default async function ClientsPage() {
   const rows = (clients as Client[] | null) ?? []
 
   return (
-    <>
+    <PageContainer>
       <div className="flex items-center justify-between mb-5">
         <div>
           <div className="text-xl font-bold">Clients</div>
@@ -54,6 +55,6 @@ export default async function ClientsPage() {
       ) : (
         <ClientsTable rows={rows} isAdmin={isAdmin} />
       )}
-    </>
+    </PageContainer>
   )
 }

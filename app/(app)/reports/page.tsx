@@ -5,6 +5,7 @@ import { zonedDayStartUTC } from '@/lib/week'
 import { resolveRange, PRESETS, type Preset } from '@/lib/reportRange'
 import { computeProfitability, type RepTask, type RepEntry, type RepClient } from '@/lib/profitability'
 import ProfitabilityReport from '@/components/ProfitabilityReport'
+import PageContainer from '@/components/PageContainer'
 
 // THE most financially sensitive surface. Agency-admin only — gated exactly like
 // /admin/costs: no €/value/cost/margin data is fetched or computed unless the caller is
@@ -52,5 +53,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     costPerHour,
   )
 
-  return <ProfitabilityReport model={model} range={range} />
+  return (
+    <PageContainer>
+      <ProfitabilityReport model={model} range={range} />
+    </PageContainer>
+  )
 }

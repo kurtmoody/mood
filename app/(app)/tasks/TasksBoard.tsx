@@ -321,7 +321,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
   function openEdit(t: Task) { setModal({ open: true, task: t, servesLabel: t.servesPost?.title ?? null }) }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">Tasks</h1>

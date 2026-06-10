@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getAccess } from '@/lib/access'
 import RaciEditor from './RaciEditor'
+import PageContainer from '@/components/PageContainer'
 
 export default async function RaciAdminPage() {
   const supabase = await createClient()
@@ -25,7 +26,7 @@ export default async function RaciAdminPage() {
   if (cErr) console.error('raci cells query failed:', cErr.message, cErr.code)
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <PageContainer>
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-bold">RACI matrix</h1>
         <Link href="/admin" className="text-sm text-[#5A5E66] hover:underline">← Admin</Link>
@@ -38,6 +39,6 @@ export default async function RaciAdminPage() {
         cells={(cells ?? []) as { task_type: string; team_member_id: string; raci_value: string }[]}
         loadError={!!tErr || !!cErr}
       />
-    </div>
+    </PageContainer>
   )
 }
