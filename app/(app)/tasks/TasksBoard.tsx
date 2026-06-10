@@ -72,7 +72,12 @@ function taskCell(key: string, t: Task) {
     case 'priority':
       return <Pill value={t.priority} colour={PRIORITY_COLOUR[t.priority] ?? '#9398A1'} />
     case 'due':
-      return fmtTaskDate(t.due_date)
+      // Show a start–due span when a start date is set, else just the due date.
+      return t.start_date
+        ? `${fmtTaskDate(t.start_date)} – ${fmtTaskDate(t.due_date)}`
+        : fmtTaskDate(t.due_date)
+    case 'estimate':
+      return t.estimated_hours != null ? `${t.estimated_hours}h` : '—'
     case 'next_action':
       return t.next_action ?? '—'
     default:
@@ -94,7 +99,7 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
   const [form, setForm] = useState<TaskInput>(task ? taskToInput(task) : {
     client_id: null, task_type: null, title: '', owner_id: null,
     status: 'Not Started', priority: 'Medium', due_date: null, next_action: null, notes: null,
-    content_item_id: null, ...seed,
+    content_item_id: null, estimated_hours: null, start_date: null, ...seed,
   })
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -144,8 +149,16 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
             </select>
           </div>
           <div>
+            <label className="block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Start date</label>
+            <input type="date" value={form.start_date ?? ''} onChange={(e) => set('start_date', e.target.value || null)} className={fieldCls} />
+          </div>
+          <div>
             <label className="block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Due date</label>
             <input type="date" value={form.due_date ?? ''} onChange={(e) => set('due_date', e.target.value || null)} className={fieldCls} />
+          </div>
+          <div>
+            <label className="block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Estimated hours</label>
+            <input type="number" step="0.5" min="0" value={form.estimated_hours ?? ''} onChange={(e) => set('estimated_hours', e.target.value === '' ? null : Number(e.target.value))} className={fieldCls} placeholder="e.g. 3" />
           </div>
           <div>
             <label className="block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Status</label>

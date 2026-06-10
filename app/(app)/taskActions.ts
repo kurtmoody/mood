@@ -17,6 +17,8 @@ export type TaskInput = {
   next_action: string | null
   notes: string | null
   content_item_id: string | null
+  estimated_hours: number | null
+  start_date: string | null
 }
 
 async function authed() {
@@ -38,6 +40,8 @@ function rpcParams(t: TaskInput) {
     p_next_action: t.next_action,
     p_notes: t.notes,
     p_content_item_id: t.content_item_id,
+    p_estimated_hours: t.estimated_hours,
+    p_start_date: t.start_date,
   }
 }
 
