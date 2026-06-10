@@ -6,6 +6,8 @@ import ContactsSection, { type Contact } from './ContactsSection'
 import BrandAssetsSection, { type BrandAsset } from './BrandAssetsSection'
 import OwnershipSection from './OwnershipSection'
 import DeleteClientSection from './DeleteClientSection'
+import TimesheetEnableToggle from './TimesheetEnableToggle'
+import TimesheetSection from '@/components/TimesheetSection'
 import InvitePanel, { type Invite } from '../../InvitePanel'
 import type { ClientDefaults, TeamOption } from '../ClientFormFields'
 import type { Ownership } from '@/lib/ownershipRoles'
@@ -37,7 +39,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
 
   const { data: client } = await supabase
     .from('client')
-    .select('id, name, status, website, industry, timezone, brand_colour, calendar_colour, client_internal ( account_owner_id, notes, billing_email, vat_number, billing_address, payment_terms, currency, retainer_amount )')
+    .select('id, name, status, website, industry, timezone, brand_colour, calendar_colour, timesheet_enabled, client_internal ( account_owner_id, notes, billing_email, vat_number, billing_address, payment_terms, currency, retainer_amount )')
     .eq('id', id)
     .maybeSingle()
 
@@ -139,6 +141,13 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
           revalidate={`/clients/${client.id}`}
           invites={(invites as Invite[] | null) ?? []}
         />
+      </div>
+
+      <div className="max-w-[680px] mt-10 flex flex-col gap-4">
+        {isAdmin && <TimesheetEnableToggle clientId={client.id} enabled={!!(client as { timesheet_enabled?: boolean }).timesheet_enabled} />}
+        {(client as { timesheet_enabled?: boolean }).timesheet_enabled && (
+          <TimesheetSection clientId={client.id} currentUserId={user.id} />
+        )}
       </div>
 
       {isAdmin && client.status === 'archived' && (
