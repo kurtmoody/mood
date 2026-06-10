@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Calendar, { STATUS, type Item } from '@/components/Calendar'
 import MonthCalendar from '@/components/MonthCalendar'
+import ContentGrid from '@/components/ContentGrid'
 import FilterMenu from '@/components/FilterMenu'
 import Drawer from '@/components/Drawer'
 import NewPostForm from './NewPostForm'
@@ -35,7 +36,7 @@ export default function CalendarBoard({
   defaultClientId: string
   channelsByClient: Record<string, Channel[]>
   posts: Item[]
-  view: 'week' | 'month'
+  view: 'week' | 'month' | 'grid'
   monday: string
   month: string
   todayStr: string
@@ -179,17 +180,18 @@ export default function CalendarBoard({
     router.push(`/?${sp.toString()}`)
   }
 
+  // month + grid both navigate by month; week navigates by week. Current view preserved.
   function prev() {
     if (view === 'week') go({ view: 'week', week: addDays(monday, -7) })
-    else go({ view: 'month', month: addMonths(month, -1) })
+    else go({ view, month: addMonths(month, -1) })
   }
   function next() {
     if (view === 'week') go({ view: 'week', week: addDays(monday, 7) })
-    else go({ view: 'month', month: addMonths(month, 1) })
+    else go({ view, month: addMonths(month, 1) })
   }
   function today() {
     if (view === 'week') go({ view: 'week', week: mondayOf(todayStr) })
-    else go({ view: 'month', month: monthOf(todayStr) })
+    else go({ view, month: monthOf(todayStr) })
   }
 
   const tab = (v: 'week' | 'month', label: string) => (
@@ -218,6 +220,14 @@ export default function CalendarBoard({
           <div className="flex items-center rounded-lg border border-[#E2E2E5] overflow-hidden text-sm">
             {tab('week', 'Week')}
             {tab('month', 'Month')}
+            {isAgency && (
+              <button
+                onClick={() => go({ view: 'grid', month })}
+                className={`px-3 py-2 ${view === 'grid' ? 'bg-[#15171C] text-white font-semibold' : 'text-[#5A5E66] hover:bg-[#F4F4F6]'}`}
+              >
+                Grid
+              </button>
+            )}
           </div>
           <div className="flex items-center rounded-lg border border-[#E2E2E5] overflow-hidden text-sm text-[#5A5E66]">
             <button onClick={prev} aria-label="Previous" className="px-2.5 py-2 hover:bg-[#F4F4F6]">‹</button>
@@ -307,7 +317,9 @@ export default function CalendarBoard({
         <div className="mb-4 rounded-lg border border-[#E0572E]/30 bg-[#E0572E]/5 px-4 py-2.5 text-sm text-[#E0572E]">{actionError}</div>
       )}
 
-      {view === 'week' ? (
+      {view === 'grid' && isAgency ? (
+        <ContentGrid posts={filtered} clients={visibleClients} onSelect={setSelected} />
+      ) : view === 'week' ? (
         <Calendar
           items={filtered}
           weekDates={weekDates(monday)}

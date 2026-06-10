@@ -58,17 +58,22 @@ export default async function Home({
     : requested && visibleIds.includes(requested) ? [requested]
     : visibleIds
 
-  const view: 'week' | 'month' = viewParam === 'month' ? 'month' : 'week'
+  // 'grid' (agency content tracker) is month-scoped — same query/source as the calendar.
+  // A client can't reach the grid (CalendarBoard renders the month calendar as fallback).
+  const view: 'week' | 'month' | 'grid' =
+    viewParam === 'month' ? 'month' : viewParam === 'grid' && isAgency ? 'grid' : viewParam === 'week' ? 'week' : 'week'
   const todayStr = todayMalta()
 
   // Both anchors are tracked independently so each view keeps its own position.
   const monday = mondayOf(isDateStr(weekParam) ? weekParam : todayStr)
   const month = isMonthStr(monthParam) ? monthParam : monthOf(todayStr)
 
-  // Fetch the active view's full visible range (Malta-day boundaries → UTC).
-  const grid = view === 'week' ? null : monthGridDates(month)
-  const rangeStartDate = view === 'week' ? monday : grid![0]
-  const rangeEndDate = view === 'week' ? addDays(monday, 7) : addDays(grid![grid!.length - 1], 1)
+  // Fetch the active view's full visible range (Malta-day boundaries → UTC). Grid uses the
+  // month window like the month view.
+  const monthRange = view !== 'week'
+  const gridDates = monthRange ? monthGridDates(month) : null
+  const rangeStartDate = monthRange ? gridDates![0] : monday
+  const rangeEndDate = monthRange ? addDays(gridDates![gridDates!.length - 1], 1) : addDays(monday, 7)
   const weekStartUTC = zonedDayStartUTC(rangeStartDate).toISOString()
   const weekEndUTC = zonedDayStartUTC(rangeEndDate).toISOString()
 
