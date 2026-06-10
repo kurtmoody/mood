@@ -1,6 +1,6 @@
 # Mood — Project Guide
 
-**Status:** Internal build, actively developed. Last updated 2026-06-09 (migration 0033).
+**Status:** Internal build, actively developed. Last updated 2026-06-10 (migration 0037).
 **Audience:** Engineers, product managers, and anyone picking this project up at any point.
 **Scope of this document:** A complete reference for what Mood is, how it's built, and how to operate it. It is the single source of truth for architecture, the data/security model, every shipped feature, the full RPC and migration ledger, conventions, and the operational runbook.
 
@@ -24,7 +24,7 @@
 12. [Notifications (bell + email)](#12-notifications)
 13. [Feature inventory](#13-feature-inventory)
 14. [RPC reference](#14-rpc-reference)
-15. [Migration ledger (0001–0033)](#15-migration-ledger)
+15. [Migration ledger (0001–0037)](#15-migration-ledger)
 16. [Conventions & hard-won gotchas](#16-conventions--hard-won-gotchas)
 17. [Testing (pgTap)](#17-testing-pgtap)
 18. [Operational runbook](#18-operational-runbook)
@@ -114,12 +114,16 @@ app/
     dashboard/page.tsx           # agency "needs attention" + task breakdowns (overdue/status/owner/client)
     tasks/                       # page.tsx + TasksBoard.tsx (switcher/filters/modal) +
                                  #   TaskKanban.tsx, TaskCalendar.tsx, types.ts (shared Task type)
-    clients/                     # CRM: list + new/ + [id]/ (+ OwnershipSection) + ownership/ (matrix)
+    clients/                     # CRM: list + new/ + [id]/ (+ OwnershipSection, InvitePanel,
+                                 #   DeleteClientSection) + ownership/ (matrix)
     admin/                       # agency_admin only: layout.tsx (gate) + page.tsx (landing) +
-                                 #   raci/ (page.tsx, RaciEditor.tsx, raciActions.ts)
-    team/                        # agency staff directory
+                                 #   raci/ (RaciEditor) + access/ (AccessEditor: roles + agency invites)
+    team/                        # agency staff directory: page.tsx + AddTeamMemberForm + TeamList
+                                 #   (edit / deactivate / permanent-delete) + actions.ts
+    InvitePanel.tsx              # reusable invite panel (agency + client scopes) + inviteActions.ts
+    viewPrefActions.ts           # setViewPreferenceAction (per-user column prefs)
   login/page.tsx                 # outside the group (no shell)
-  auth/callback/page.tsx         # client-side OTP/PKCE callback + claim_client_access
+  auth/callback/page.tsx         # client-side OTP/PKCE callback + accept_pending_invites + claim_client_access
 
 components/
   AppShell.tsx Sidebar.tsx TopBar.tsx UserMenu.tsx   # shell (Sidebar nav gated by role)
@@ -130,6 +134,7 @@ components/
   VersionHistory.tsx ClientVersionHistory.tsx         # version history (agency embed / client RPC)
   NotificationBell.tsx                                # bell + unread badge + dropdown
   FilterMenu.tsx ColourPicker.tsx                     # multi-select dropdown / swatch colour picker
+  ColumnPicker.tsx                                    # reusable column hide/show/reorder popover (view-agnostic)
   # (ClientSwitcher.tsx removed — replaced by the Clients multi-select FilterMenu)
 
 lib/
@@ -140,8 +145,9 @@ lib/
   colour.ts                                           # CLIENT_PALETTE, clientColour(), textOn(), fallbackColour()
   taskConstants.ts                                    # TASK_TYPES / STATUSES / PRIORITIES + colours (single source)
   ownershipRoles.ts                                   # OWNERSHIP_ROLES (the 8 client_ownership role slots)
+  viewColumns.ts                                      # ColumnDef/ColumnConfig + mergeColumns (column-pref mechanism)
 
-migrations/                       # numbered SQL (0001–0032) + pgTap *_test.sql
+migrations/                       # numbered SQL (0001–0037) + pgTap *_test.sql
 proxy.ts                          # Next 16 middleware → updateSession
 schema.sql                        # fresh-setup reference (DESTRUCTIVE reset block — never run on live)
 supabase/functions/notify-email/index.ts   # Deno Edge Function: notification → Resend email
@@ -182,6 +188,8 @@ Core tables are defined in `schema.sql`; later tables/columns are added by migra
 | `raci_matrix` (agency reference) | 0027, editable 0032 | `id`, `agency_id`, `task_type`, `team_member_id` (→ team_member **on delete cascade**), `raci_value` (A/R/C/I/S), `created_at`; unique `(agency_id, task_type, team_member_id)`. Agency-scoped RLS read; **edited via the admin-only `set_raci_matrix` RPC (0032)** — no write policies. Seeded for Mood Agency (15 task types × 7 people). |
 | `task` (internal management) | 0028, +`content_item_id` 0031 | `id`, `agency_id`, `client_id` (nullable, `on delete set null`), `content_item_id` (nullable → content_item **on delete set null**, 0031 — links a task to a post), `task_type`, `title`, `owner_id` (→ team_member), `status` (default 'Not Started'), `priority` (default 'Medium'), `due_date`, `next_action`, `notes`, `created_by`, timestamps. **Internal-only** (agency-scoped read via `is_agency_member`; no client access path). RPC-only writes. Values validated app-side via `lib/taskConstants.ts`. |
 | `client_ownership` (1:1 with client, **agency-only**) | 0030 | `client_id` (PK → client **on delete cascade**) + eight nullable role slots → `team_member` (`lead_pm_id`, `comms_backup_id`, `creative_lead_id`, `design_owner_id`, `content_owner_id`, `video_owner_id`, `sales_ops_id`, `intern_support_id`), `updated_at`. Internal staffing — **no client branch**. Written via `set_client_ownership`. |
+| `invite` (agency + client scopes) | 0035 | `id`, `email` (stored **lower-cased**, no citext dep), `scope_type` (`agency`/`client`), `scope_id`, `role`, `status` (`pending`/`accepted`/`revoked`/`expired`, default pending), `invited_by`, `created_at`, `expires_at` (default now()+7d), `accepted_at`. Partial unique index `(email, scope_type, scope_id) where status='pending'` blocks duplicate live invites. RLS read = the `agency_admin` whose agency owns the scope; **no write policies** (RPC-only). |
+| `user_view_preference` (per-user UI prefs) | 0037 | PK `(user_id, view_key)`; `config` jsonb (ordered `[{key,hidden}]`), `updated_at`. `user_id → auth.users **on delete cascade**`. **Own-rows-only RLS** (`user_id = auth.uid()` for read + write) — the rare table a user writes for itself, still upserted via the `set_view_preference` RPC for consistency. Display-only personalisation, keyed by a `view_key` (e.g. `'tasks'`). |
 
 > The legacy `asset` table (original Drive-flavoured table, never used, superseded by `media` + `post_asset_link`) was **dropped in 0029** — it had a status-less read policy (a latent gap) and is gone from both the DB and `schema.sql`.
 
@@ -216,6 +224,8 @@ So clients see only their own client's posts, and only from **`client_review` on
 Some tables aren't client-facing at all — they gate on **agency membership**, not the content read floor:
 - **`raci_matrix` (0027)** and **`task` (0028)**: `for select using (is_agency_member(agency_id))` — agency members of that agency only. `task` deliberately has **no client branch** (tasks are internal). Both are **read-only via RLS with no write policies**; `task` writes go through `create/update/delete_task` (raci is reference data, seeded, no write path yet).
 - The CRM-internal tables (`client_internal`, `team_member`, `client_contact`, `brand_asset`) are likewise agency-scoped.
+- **`invite` (0035)**: read-only via RLS to the **`agency_admin`** whose agency owns the scope (agency scope → `scope_id` is their agency; client scope → the client belongs to their agency); writes are RPC-only (`create_invite`/`revoke_invite`).
+- **`user_view_preference` (0037)** is the one **own-rows-only** table (`user_id = auth.uid()` for both read and write) — personal UI prefs, never visible to anyone else; still written via the `set_view_preference` RPC.
 
 ### RPC-only writes (migration 0016, pgTap-proven)
 There are **NO permissive write policies** on the content tables. Every write — `create_post`, `update_post`, `transition_post`, `add_comment`, `add_media`, `delete_media`, `reorder_media`, the CRM RPCs, etc. — goes through a SECURITY DEFINER RPC that does its own authorisation. **Do not add write policies.**
@@ -250,7 +260,7 @@ Where a feature could leak data (e.g. client version history), the answer is a *
 
 Gating happens in server components: `app/(app)/layout.tsx` (nav/shell) and `app/(app)/page.tsx` (query scope + which controls render). Agency-only pages (`/tasks`, `/clients`, `/team`, `/dashboard`) hard-redirect non-agency users to `/`.
 
-**Admin role (0032).** `getAccess` exposes **`isAgencyAdmin`** (a `role = 'agency_admin'` membership) and **`agencyId`** (the user's agency). The **Admin area** is gated on the role, not just `type === 'agency'`: the `Admin` nav item is `adminOnly` (shown only to admins), `app/(app)/admin/layout.tsx` hard-redirects non-admins from `/admin*`, and admin RPCs (e.g. `set_raci_matrix`) re-check `agency_admin` server-side. This is the first real use of the `agency_admin` vs `agency_member` split — other agency pages still gate on *any* agency membership (extending finer per-action permissions is an open item, §19).
+**Admin role (0032+).** `getAccess` exposes **`isAgencyAdmin`** (a `role = 'agency_admin'` membership) and **`agencyId`** (the user's agency). The **Admin area** is gated on the role, not just `type === 'agency'`: the `Admin` nav item is `adminOnly` (shown only to admins), `app/(app)/admin/layout.tsx` hard-redirects non-admins from `/admin*`, and admin RPCs re-check `agency_admin` server-side. The `agency_admin` vs `agency_member` split now governs a growing set of high-stakes actions, all re-checked inside their RPCs: editing the RACI matrix (`set_raci_matrix`), promoting/demoting members (`set_member_role`), creating/revoking invites (`create_invite`/`revoke_invite`), and the **permanent deletes** (`delete_team_member`/`delete_client`, 0036). The corresponding UI affordances (Team access toggles, invite panels, "Delete permanently" buttons) are hidden for non-admins. Routine agency pages still gate on *any* agency membership; broadening the admin gate further is an open item (§19).
 
 **The real team is seeded.** `team_member` for Mood Agency holds the actual staff — **Sandrina, Tiffany, Michelle, Aiden, Design Intern, Marketing Intern** (plus Kurt Hili) — which `raci_matrix`, task owners, and `client_ownership` resolve against by `full_name`. **Michelle and Sandrina hold `agency_admin` memberships** (so they see the Admin area).
 
@@ -346,12 +356,27 @@ Persistent sidebar (pinnable on desktop, off-canvas on mobile) + top bar. Nav ga
 ### Client CRM
 - `/clients` list + create (`create_client`).
 - `/clients/[id]` detail/edit (`update_client`) with account owner from the team directory.
-- `/team` agency staff directory (`add_team_member`).
+- `/team` agency staff directory — add (`add_team_member`), **edit + soft-deactivate/reactivate (0034)** (`update_team_member`/`set_team_member_active`; an Active/All filter keeps deactivated members reachable), and **admin-only permanent delete (0036)**. Deactivated members drop out of assignment dropdowns.
 - **Contacts** CRUD per client (single-primary enforced) with a **portal-access invite toggle** (`set_contact_portal_access`).
 - **Brand assets** CRUD per client (`add/update/delete_brand_asset`).
 - **Channels** per client (`add_channel`/`delete_channel`).
 - **Per-client ownership (0030)** — an **Ownership** section on `/clients/[id]` (eight role dropdowns from the team — Lead PM, comms backup, creative/design/content/video owners, sales/ops, intern support — saved via `set_client_ownership`), plus a read-only **`/clients/ownership` matrix** (all clients × roles), linked from the Clients header.
+- **Invites + permanent delete** on `/clients/[id]` — an invite panel (client portal access by email) and, for archived clients, an admin-only Danger-zone delete (see below).
 All via SECURITY DEFINER RPCs.
+
+### Invites (0035)
+Supabase-native magic-link onboarding for both **agency** and **client** scopes. An invite is a server-side record of intent — no custom token: the invitee signs in with the normal magic link for their invited email, and **`accept_pending_invites()` (run on every login, alongside `claim_client_access`)** grants exactly what a live pending invite backs.
+- **Agency invites** on `/admin/access` (scope `agency`, role `agency_member`); **client invites** on `/clients/[id]` (scope `client`, role approver/viewer). Both list pending invites with a **Revoke** action, admin-only via `create_invite`/`revoke_invite`.
+- `accept_pending_invites` grants membership straight from the invite row (scope/role) so a **client invite can never yield agency access**, links the matching `team_member`/`client_contact` directory row by email, and is idempotent (`on conflict do nothing`). Expired/revoked/absent invites grant nothing.
+- **Email auto-send is not wired yet** (the `notify-email` function keys on an existing `user_id`, which an invitee doesn't have) — the admin shares the login for now; see §19.
+
+### Permanent delete (0036)
+Two-step, admin-only hard deletes, each in one transaction:
+- **`delete_team_member(id, successor_id)`** — *reassign-then-delete*. Requires the member already **deactivated** and refuses if a login is linked. Reassigns the leaver's `task.owner_id`, `client_internal.account_owner_id`, all 8 `client_ownership` slots, and RACI cells (with a **merge** to respect `uq_raci_cell`) to a chosen successor, then deletes. Surfaced as "Delete permanently" on inactive members (successor picker).
+- **`delete_client(id)`** — *guarded cascade*. Requires `status = 'archived'`. Explicitly removes the three non-cascading children (`task` — SET NULL; client-scoped `membership`/`invite` — no FK), then deletes the client, cascading content/versions/comments/approvals/media/channels/contacts/brand assets/ownership. **DB-only — storage objects are not purged.** Surfaced as a Danger zone on archived clients.
+
+### Per-user column preferences (0037)
+A **view-agnostic** mechanism for hide/show/reorder of table columns, shipped on the **task list**. A view declares its columns (`lib/viewColumns.ts` + per-view `COLUMNS`); the `ColumnPicker` popover (checkboxes + drag-to-reorder, with non-lockable columns like the task title always shown) saves to `set_view_preference('tasks', config)`. On load, the saved config is **merged** with the current column set so a column added later defaults to visible rather than vanishing for existing users. Clients/team lists can adopt it with minimal work (open item, §19).
 
 ### Content engine
 - **Calendar** (`app/(app)/page.tsx` + `CalendarBoard`): real-dated **Week/Month** views (Europe/Malta, Monday-start), Prev/Today/Next, state in the URL (`?clients/?client/?week/?month/?view`). Click a post → detail drawer. `?post=` deep-link opens a specific post's drawer (used by the bell and dashboard).
@@ -373,17 +398,17 @@ All via SECURITY DEFINER RPCs.
 - **Content ↔ task bridge (0031)** — a post's drawer lists its linked tasks + **"Add task for this post"** (opens the task modal prefilled with the post's client + `content_item_id`); the task list/modal show which post a task **serves** (links back to it). New tasks **default their owner to the client's Lead PM** (`client_ownership.lead_pm_id`) when a client is picked — editable, not a lock. Manual only (no auto-spawn yet).
 - **RACI matrix (0027, editable 0032)** — the responsibility grid, now **editable in the Admin area** (`/admin/raci`) via `set_raci_matrix`. Seeded for Mood Agency.
 
-### Admin area (0032, 0033)
+### Admin area (0032, 0033, 0035)
 `/admin` — **agency_admin only** (nav `adminOnly`, `admin/layout.tsx` hard-redirect, and the RPCs re-check admin server-side). A settings landing structured to grow (a `SECTIONS` array):
 - **RACI matrix editor** (`/admin/raci`, 0032) — a 15 × N grid of dropdowns (`—`/A/R/S/C/I/A/R), prefilled, one **Save** → replace-all via `set_raci_matrix`.
-- **Team access** (`/admin/access`, 0033) — lists agency users (via `list_agency_members`) with an Admin/Member toggle per person (`set_member_role`); the **last admin's toggle is disabled** ("At least one admin is required"), mirroring the RPC's lockout guard.
+- **Team access** (`/admin/access`, 0033) — lists agency users (via `list_agency_members`) with an Admin/Member toggle per person (`set_member_role`); the **last admin's toggle is disabled** ("At least one admin is required"), mirroring the RPC's lockout guard. Also hosts the **agency invite panel** (0035) — invite teammates by email + a pending-invite list with Revoke.
 
 ### Approval & versioning
 - Client Approve / Request-changes surfaced in the drawer for `client_review` posts (role-aware action set; note required for request_changes).
 - Snapshot-on-send versioning (§10), agency + client version-history viewers.
 
 ### Client portal
-- Access model + invite toggle (0013), **claim-on-login** (callback → `claim_client_access`), restricted client calendar + nav gating, client-authorised transitions (0017).
+- Access model + invite toggle (0013), **claim-on-login** (callback → `accept_pending_invites` then `claim_client_access`), restricted client calendar + nav gating, client-authorised transitions (0017). Portal access can now also be granted by an explicit **invite** (0035), not only the contact portal-access toggle.
 - **Real revocation (0020):** `set_contact_portal_access(..., false)` now also **deletes** the user's client-scope membership for that client (tightly scoped — agency/other-client memberships untouched), so an already-logged-in contact loses access immediately.
 
 ### Notifications
@@ -393,7 +418,7 @@ Data layer + emit (0019), enriched copy (0023), in-app bell, email Edge Function
 `/dashboard` (agency-only): a cross-client "needs attention" view aggregating `content_item` across **all** the agency's clients via RLS (no client filter). Sections — "Needs your action" (`internal_review`/`changes_requested`), "Awaiting client" (`client_review`, flagging items aged > 3 days), and a richer **task summary**: a prominent **overdue count** plus open-task breakdowns **By status** (→ `/tasks?status=`), **By owner** (→ `/tasks?owner=`), and **By client**. Each content row deep-links to the post. Read-only.
 
 ### Security (all pgTap-proven)
-Content read floor (0015), content tables RPC-only (0016), client transitions (0017), media table + storage policies (0018), notification RLS (0019), revoke (0020), versioning guards (0021), client version filter (0022), media reorder authorisation (0024), asset-link read floor + RPC auth (0026), task RLS + RPC auth (0028), client_ownership RLS + RPC auth (0030), RACI admin-write auth (0032), member-role admin-write + last-admin lockout (0033).
+Content read floor (0015), content tables RPC-only (0016), client transitions (0017), media table + storage policies (0018), notification RLS (0019), revoke (0020), versioning guards (0021), client version filter (0022), media reorder authorisation (0024), asset-link read floor + RPC auth (0026), task RLS + RPC auth (0028), client_ownership RLS + RPC auth (0030), RACI admin-write auth (0032), member-role admin-write + last-admin lockout (0033), team-member edit/deactivate auth (0034), invite create/accept auth incl. the client→agency leak guard (0035), permanent-delete auth + reassign/cascade + RACI merge (0036), view-preference own-rows RLS (0037).
 
 ---
 
@@ -440,6 +465,30 @@ All RPCs are `SECURITY DEFINER` with `set search_path=''` and an `auth.uid()` nu
 | `set_raci_matrix` | `(agency_id, cells jsonb) → void` | **agency_admin of that agency** | Transactional replace-all of the grid; validates team members; skips blank cells. |
 | `set_member_role` | `(target_user_id, agency_id, role) → void` | **agency_admin of that agency** | Promote/demote between `agency_admin`/`agency_member`; validates the role + existing membership; **last-admin lockout**; casts `role::member_role`. |
 | `list_agency_members` | `(agency_id) → table(user_id, role, full_name, email)` | **agency_admin of that agency** | Read helper — `membership` is own-rows-only under RLS; resolves name from `team_member`, email from `auth.users`. |
+
+### Team directory (0034)
+| RPC | Signature | Auth | Notes |
+|---|---|---|---|
+| `update_team_member` | `(id, full_name, role, email, is_active) → void` | agency member of the member's agency | Edit a member; rejects empty `full_name`. |
+| `set_team_member_active` | `(id, is_active) → void` | agency member of the member's agency | Quick soft-deactivate/reactivate toggle. |
+
+### Invites (0035)
+| RPC | Signature | Auth | Notes |
+|---|---|---|---|
+| `create_invite` | `(email, scope_type, scope_id, role) → uuid` | **agency_admin** of the scope's agency | Validates the scope/role combo (agency→`agency_member`; client→`client_approver`/`client_viewer`), ownership of the scope (the **cross-tenant guard**), and no duplicate pending invite. |
+| `revoke_invite` | `(id) → void` | **agency_admin** of the scope's agency | Sets `status='revoked'`. |
+| `accept_pending_invites` | `() → int` | self (on login) | Reads the caller's email from `auth.users` (**never a param**); grants membership straight from each live pending invite (scope/role), links the directory row by email, marks accepted. Idempotent; grants nothing not backed by a pending invite. |
+
+### Permanent delete (0036)
+| RPC | Signature | Auth | Notes |
+|---|---|---|---|
+| `delete_team_member` | `(id, successor_id) → void` | **agency_admin** of the member's agency | Two-step: member must be **inactive** and have **no linked login**. Reassigns tasks / account ownership / 8 ownership slots / RACI (with merge) to the successor, then deletes. |
+| `delete_client` | `(id) → void` | **agency_admin** of the client's agency | Two-step: `status='archived'`. Deletes non-cascading children (task, client-scoped membership/invite) then the client (cascades the rest). DB-only — storage not purged. |
+
+### View preferences (0037)
+| RPC | Signature | Auth | Notes |
+|---|---|---|---|
+| `set_view_preference` | `(view_key, config jsonb) → void` | self (logged-in) | Upserts the caller's own `(user_id, view_key)` row. No admin gate. Validates `config` is a JSON array. |
 
 ### Portal & CRM
 | RPC | Signature | Auth |
@@ -499,6 +548,10 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 | 0031 | task_content_link | `task.content_item_id` (nullable, on delete set null); `create_task`/`update_task` gain `p_content_item_id` (drop+recreate). |
 | 0032 | raci_edit (+test) | `set_raci_matrix` RPC — agency_admin-only transactional replace-all of the grid. No table change. |
 | 0033 | set_member_role (+test) | `set_member_role` (admin-only promote/demote with last-admin lockout) + `list_agency_members` read helper. No table change. |
+| 0034 | team_member_edit (+test) | `update_team_member` + `set_team_member_active` (edit + soft-deactivate/reactivate; agency-scoped auth). No table change. |
+| 0035 | invites (+test) | `invite` table (agency + client scopes, admin-read RLS, RPC-only) + `create_invite`/`revoke_invite`/`accept_pending_invites`. Magic-link-native; accept-on-login. |
+| 0036 | permanent_delete (+2 tests) | `delete_team_member` (reassign-then-delete) + `delete_client` (guarded cascade) — both admin-only + two-step. No table change. |
+| 0037 | view_preferences (+test) | `user_view_preference` table (own-rows-only RLS) + `set_view_preference` upsert RPC. Per-user column prefs. |
 
 > `schema.sql` is the fresh-setup reference **only** — it has a destructive reset block at the top; **never run it against the live DB.** New changes go in a migration.
 
@@ -556,9 +609,9 @@ supabase functions deploy notify-email
 ```
 Then ensure a **Database Webhook** exists on `public.notification` (event INSERT) pointing at the function URL. Email needs the verified Resend domain (`mail.mood.mt`). The Edge change only takes effect after redeploy.
 
-### Outstanding operational tasks (as of 2026-06-09)
-- Migrations through **0032** are applied (ownership, task↔content link, admin RACI editing are live).
-- Email delivery is **live**: `notify-email` deployed + Database Webhook `notify_email_on_insert` on `notification` INSERT, sending via Resend (`mail.mood.mt`). Runbook: `supabase/functions/notify-email/DEPLOY.md`.
+### Outstanding operational tasks (as of 2026-06-10)
+- Migrations through **0037** are applied (permission management, team edit/deactivate, invites, permanent delete, and per-user column prefs are live). Apply each new `migrations/NNNN_*.sql` in the SQL editor as it ships.
+- Email delivery is **live**: `notify-email` deployed + Database Webhook `notify_email_on_insert` on `notification` INSERT, sending via Resend (`mail.mood.mt`). Runbook: `supabase/functions/notify-email/DEPLOY.md`. (Notification emails only — **invite emails are not auto-sent yet**, see §19.)
 
 ### Environment
 - App: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (`.env.local` + Vercel).
@@ -570,11 +623,14 @@ Then ensure a **Database Webhook** exists on `public.notification` (event INSERT
 ## 19. Open items & roadmap
 
 ### Open (not built)
-1. **Finer permissions** *(security/access)* — admin/member is now enforced and **manageable** (Admin → Team access, `set_member_role`, 0033, with a last-admin lockout). What's still open: most agency pages gate on *any* agency membership, so extend the `isAgencyAdmin` gate to other destructive actions (delete client, billing, manage team).
-2. **Task-system future slices** — **subtasks/checklists**; **client-facing task sharing** (selected tasks visible in the portal — `task` is internal-only by design today); **auto-spawn from templates** (create the standard task set for a new post/client); a **gantt/timeline** view. (Kanban, the task calendar, and the content↔task bridge are done.)
-3. **@mentions** — mention internal (`team_member`) and external (`client_contact`/portal) people on comments (and later other objects), stored as **structured rows** (not parsed from text), emitted from the existing RPC write paths.
-4. **Bell realtime** — currently polls on open; add Supabase realtime for live unread updates.
-5. **Pervasive notification preferences** — Monday.com-style per-user × per-channel toggles (`notification_preference` table planned).
+1. **Auto-send invite emails** *(0035 follow-on)* — the invite record + accept-on-login flow are live, but the email is shared manually. The `notify-email` function keys on an existing `user_id` (which an invitee lacks), so auto-send needs a separate path (service-role `inviteUserByEmail`/`generateLink`, or an invite-specific email).
+2. **WEBHOOK_SECRET hardening** *(notifications)* — the `notify-email` Edge Function has an optional shared-secret header check, currently **commented out (V1)**. Set `WEBHOOK_SECRET` as an Edge secret + the matching header on the Database Webhook and enable the check.
+3. **Column prefs on more views** *(0037 follow-on)* — the mechanism is view-agnostic and shipped on the task list; adopt it on the **clients** and **team** lists (define each view's `COLUMNS`, read its pref, drop in `<ColumnPicker>`).
+4. **Finer permissions** *(security/access)* — admin/member is enforced and manageable, and the high-stakes actions (RACI edit, role changes, invites, permanent deletes) are admin-gated. What's still open: most *routine* agency pages gate on any agency membership; decide which further actions (billing edits, etc.) should require `agency_admin`.
+5. **Task-system future slices** — **subtasks/checklists**; **client-facing task sharing** (selected tasks visible in the portal — `task` is internal-only by design today); **auto-spawn from templates** (create the standard task set for a new post/client); a **gantt/timeline** view. (Kanban, the task calendar, and the content↔task bridge are done.)
+6. **@mentions** — mention internal (`team_member`) and external (`client_contact`/portal) people on comments (and later other objects), stored as **structured rows** (not parsed from text), emitted from the existing RPC write paths.
+7. **Bell realtime** — currently polls on open; add Supabase realtime for live unread updates.
+8. **Pervasive notification preferences** — Monday.com-style per-user × per-channel toggles (`notification_preference` table planned).
 
 ### Architecture intent for the notification spine (so current choices don't block it)
 - Emit from the existing SECURITY DEFINER RPC write paths (single choke point) — already the case.
@@ -582,7 +638,7 @@ Then ensure a **Database Webhook** exists on `public.notification` (event INSERT
 - Planned tables: `notification` (built) and `notification_preference` (future).
 
 ### Recently completed (this development cycle)
-Client Approve/Request-changes UI · snapshot-on-send versioning · agency + client version history · agency dashboard · calendar filters · month-view media indicator · enriched notification copy · persisted media ordering + drag-reorder · real portal revocation · **combined all-clients calendar** · **per-client `calendar_colour` + legend** · **labelled asset links (0026)** · **RACI reference data (0027)** · **internal task list + dashboard summary (0028)** · sidebar logo · **legacy `asset` table dropped (0029)** · **per-client ownership + matrix (0030)** · **content↔task bridge + Lead-PM owner suggestion (0031)** · **admin area + editable RACI matrix (0032)** · **task List/Kanban/Calendar views + deeper dashboard breakdowns**.
+Client Approve/Request-changes UI · snapshot-on-send versioning · agency + client version history · agency dashboard · calendar filters · month-view media indicator · enriched notification copy · persisted media ordering + drag-reorder · real portal revocation · **combined all-clients calendar** · **per-client `calendar_colour` + legend** · **labelled asset links (0026)** · **RACI reference data (0027)** · **internal task list + dashboard summary (0028)** · sidebar logo · **legacy `asset` table dropped (0029)** · **per-client ownership + matrix (0030)** · **content↔task bridge + Lead-PM owner suggestion (0031)** · **admin area + editable RACI matrix (0032)** · **task List/Kanban/Calendar views + deeper dashboard breakdowns** · **permission management: Admin → Team access, promote/demote with last-admin lockout (0033)** · **team member edit + soft-deactivate/reactivate (0034)** · **agency + client invites, magic-link-native, accept-on-login (0035)** · **permanent delete: reassign-then-delete team members, guarded-cascade clients (0036)** · **per-user column preferences on the task list (0037)**.
 
 ---
 
@@ -604,7 +660,12 @@ Client Approve/Request-changes UI · snapshot-on-send versioning · agency + cli
 | **Admin area** | `/admin*`, gated on the `agency_admin` role (`isAgencyAdmin`) — agency configuration (RACI editor today). |
 | **Ownership** | Per-client internal staffing (`client_ownership`, 0030): eight role slots → team members. The Lead PM seeds a new task's default owner. |
 | **Serves post** | A task linked to a `content_item` (`task.content_item_id`, 0031) — surfaced both on the post drawer and the task. |
+| **Invite** | A pending record of intent (`invite`, 0035) to grant an agency or client membership; redeemed by `accept_pending_invites()` when the invited email logs in. |
+| **Accept-on-login** | `accept_pending_invites()` (run with `claim_client_access` in the auth callback) granting exactly the memberships backed by the user's live pending invites. |
+| **Reassign-then-delete** | `delete_team_member` (0036) moving a leaver's tasks/ownership/RACI to a successor before removing the directory row. |
+| **Two-step delete** | Permanent deletes (0036) require a reversible soft state first — a team member must be deactivated, a client archived. |
+| **View preference** | A per-user `(view_key, config)` row (`user_view_preference`, 0037) storing column order + hidden flags; merged with the live column set on load. |
 
 ---
 
-*This document reflects the codebase at migration 0033. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*
+*This document reflects the codebase at migration 0037. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*
