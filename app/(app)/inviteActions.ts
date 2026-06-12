@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -29,7 +30,27 @@ export async function createInviteAction(
     p_scope_id: scopeId,
     p_role: role,
   })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
+
+  const revalidate = formData.get('revalidate') as string | null
+  if (revalidate) revalidatePath(revalidate)
+  return { error: null, ok: true }
+}
+
+// Reset a pending invite's expiry to 7 days from now (admin-only, enforced in the RPC).
+export async function extendInviteAction(
+  _prev: InviteState,
+  formData: FormData,
+): Promise<InviteState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const id = (formData.get('id') as string | null)?.trim()
+  if (!id) return { error: 'Missing invite id.', ok: false }
+
+  const { error } = await supabase.rpc('extend_invite', { p_id: id })
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   const revalidate = formData.get('revalidate') as string | null
   if (revalidate) revalidatePath(revalidate)
@@ -48,7 +69,7 @@ export async function revokeInviteAction(
   if (!id) return { error: 'Missing invite id.', ok: false }
 
   const { error } = await supabase.rpc('revoke_invite', { p_id: id })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   const revalidate = formData.get('revalidate') as string | null
   if (revalidate) revalidatePath(revalidate)

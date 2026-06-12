@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -30,7 +31,7 @@ export async function transitionPostAction(_prev: TransitionState, fd: FormData)
     p_action: action,
     p_note: note,
   })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath('/')
   return { error: null, ok: true }

@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -22,7 +23,7 @@ export async function addCommentAction(_prev: CommentState, fd: FormData): Promi
   if (!body) return { error: 'Comment cannot be empty.', ok: false }
 
   const { error } = await supabase.rpc('add_comment', { p_item_id: itemId, p_body: body })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath('/')
   return { error: null, ok: true }
@@ -37,7 +38,7 @@ export async function deleteCommentAction(_prev: CommentState, fd: FormData): Pr
   if (!commentId) return { error: 'Missing comment.', ok: false }
 
   const { error } = await supabase.rpc('delete_comment', { p_comment_id: commentId })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath('/')
   return { error: null, ok: true }

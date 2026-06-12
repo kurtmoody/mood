@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useRef } from 'react'
-import { createInviteAction, revokeInviteAction, type InviteState } from './inviteActions'
+import { createInviteAction, extendInviteAction, revokeInviteAction, type InviteState } from './inviteActions'
 import { labelCls, fieldCls, btnPrimary } from '@/components/ui'
 
 export type Invite = {
@@ -87,25 +87,48 @@ export default function InvitePanel({
   )
 }
 
+// 'expired' / 'expires today' / 'N days left' — coarse on purpose, it's a hint.
+function expiryHint(expiresAt: string): { label: string; expired: boolean } {
+  const days = Math.floor((new Date(expiresAt).getTime() - Date.now()) / 86_400_000)
+  if (days < 0) return { label: 'expired', expired: true }
+  if (days === 0) return { label: 'expires today', expired: false }
+  return { label: `${days} day${days === 1 ? '' : 's'} left`, expired: false }
+}
+
 function InviteRow({ inv, revalidate }: { inv: Invite; revalidate: string }) {
-  const [state, action, pending] = useActionState(revokeInviteAction, initial)
+  const [revokeState, revoke, revoking] = useActionState(revokeInviteAction, initial)
+  const [extendState, extend, extending] = useActionState(extendInviteAction, initial)
+  const expiry = expiryHint(inv.expires_at)
+  const error = revokeState.error ?? extendState.error
 
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
       <div className="flex items-center gap-2 min-w-0">
         <span className="truncate">{inv.email}</span>
-        <span className="text-[11px] text-[#9398A1] border border-[#ECECEE] rounded-full px-2 py-0.5 shrink-0">
+        <span className="text-[11px] text-faint border border-line rounded-full px-2 py-0.5 shrink-0">
           {ROLE_LABEL[inv.role] ?? inv.role}
         </span>
+        <span className={`text-[11px] shrink-0 ${expiry.expired ? 'text-accent' : 'text-faint'}`}>
+          {expiry.label}
+        </span>
       </div>
-      <form action={action} className="shrink-0">
-        <input type="hidden" name="id" value={inv.id} />
-        <input type="hidden" name="revalidate" value={revalidate} />
-        <button type="submit" disabled={pending} className="text-[#5A5E66] hover:text-red-600 disabled:opacity-50">
-          {pending ? 'Revoking…' : 'Revoke'}
-        </button>
-      </form>
-      {state.error && <span className="text-red-600">{state.error}</span>}
+      <div className="flex items-center gap-3 shrink-0">
+        <form action={extend}>
+          <input type="hidden" name="id" value={inv.id} />
+          <input type="hidden" name="revalidate" value={revalidate} />
+          <button type="submit" disabled={extending} className="text-muted hover:text-ink disabled:opacity-50 cursor-pointer">
+            {extending ? 'Extending…' : 'Extend'}
+          </button>
+        </form>
+        <form action={revoke}>
+          <input type="hidden" name="id" value={inv.id} />
+          <input type="hidden" name="revalidate" value={revalidate} />
+          <button type="submit" disabled={revoking} className="text-muted hover:text-red-600 disabled:opacity-50 cursor-pointer">
+            {revoking ? 'Revoking…' : 'Revoke'}
+          </button>
+        </form>
+      </div>
+      {error && <span className="text-red-600">{error}</span>}
     </div>
   )
 }

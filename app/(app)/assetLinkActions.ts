@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -16,7 +17,7 @@ async function authed() {
 export async function addAssetLinkAction(contentItemId: string, label: string, url: string): Promise<LinkResult> {
   const supabase = await authed()
   const { error } = await supabase.rpc('add_asset_link', { p_content_item_id: contentItemId, p_label: label, p_url: url })
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
   revalidatePath('/')
   return { error: null }
 }
@@ -24,7 +25,7 @@ export async function addAssetLinkAction(contentItemId: string, label: string, u
 export async function updateAssetLinkAction(linkId: string, label: string, url: string): Promise<LinkResult> {
   const supabase = await authed()
   const { error } = await supabase.rpc('update_asset_link', { p_link_id: linkId, p_label: label, p_url: url })
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
   revalidatePath('/')
   return { error: null }
 }
@@ -32,7 +33,7 @@ export async function updateAssetLinkAction(linkId: string, label: string, url: 
 export async function deleteAssetLinkAction(linkId: string): Promise<LinkResult> {
   const supabase = await authed()
   const { error } = await supabase.rpc('delete_asset_link', { p_link_id: linkId })
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
   revalidatePath('/')
   return { error: null }
 }
@@ -40,7 +41,7 @@ export async function deleteAssetLinkAction(linkId: string): Promise<LinkResult>
 export async function reorderAssetLinkAction(contentItemId: string, orderedIds: string[]): Promise<LinkResult> {
   const supabase = await authed()
   const { error } = await supabase.rpc('reorder_asset_link', { p_content_item_id: contentItemId, p_ordered_ids: orderedIds })
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
   revalidatePath('/')
   return { error: null }
 }

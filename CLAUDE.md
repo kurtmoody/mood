@@ -36,7 +36,7 @@ Out of scope (do NOT build): publishing/scheduling to social networks, analytics
 - `proxy.ts` — calls updateSession. `schema.sql` — fresh-setup reference (see Migrations). `migrations/` — numbered SQL + pgTap tests.
 
 ## Migrations
-- Schema changes are numbered files `migrations/NNNN_name.sql`, run **manually** in the Supabase SQL editor (not auto-applied). Idempotent (`create … if not exists`, `drop policy if exists` then create, `create or replace`). Currently **0001–0048**.
+- Schema changes are numbered files `migrations/NNNN_name.sql`, run **manually** in the Supabase SQL editor (not auto-applied). Idempotent (`create … if not exists`, `drop policy if exists` then create, `create or replace`). Currently **0001–0049**.
 - `schema.sql` is the fresh-setup reference ONLY — it has a destructive reset block at the top; **never run it against the live DB**. New changes go in a migration, not schema.sql.
 - Security-sensitive migrations ship a pgTap test `NNNN_*_test.sql`, runnable in the hosted editor (no basejump): temp `_t` + `grant insert on _t to authenticated` + `plan()` BEFORE any role switch; act via `set local role authenticated` + a `request.jwt.claims` GUC; drop to `set local role postgres` (not reset) to read true state; aggregate via `union all`; `throws_ok(sql,'<sqlstate>')` 2-arg, `is_empty`/`isnt_empty` for silent RLS reads.
 
@@ -59,8 +59,8 @@ Added by 0019–0048 (headlines; read the migration for detail):
 - `client_ownership` (0030) — per-client role assignments (lead PM, creative lead, …). `user_view_preference` (0037). `internal_note` (0039, agency-only, on posts).
 - Team/admin: `set_member_role` (0033), team member edit (0034), `invite` (0035 — pending-invite flow, 7-day expiry), permanent delete RPCs with reassignment (0036), revoke access (0020), set_client_status (0040).
 - Production meta on posts (0042): designer, design_status, drive/high-res URLs, boost/ad budget, posted date/URL — powers the Grid view.
-- Money/reporting: `time_entry` (0044 — timesheets; readable by ALL agency members, deliberate?), task `value` (0045), `agency_internal.cost_per_hour` (0046 → relocated admin-only in 0047 because RLS can't hide a column).
-- 0048 — dropped the legacy permissive `client_internal_write` policy (last write side-door; predated the 0016 convention).
+- Money/reporting: `time_entry` (0044 — timesheets; readable by all agency members, **by design** — decided June 2026), task `value` (0045), `agency_internal.cost_per_hour` (0046 → relocated admin-only in 0047 because RLS can't hide a column). `retainer_amount` deliberately stays member-readable (decided June 2026) — do not relocate it.
+- 0048 — dropped the legacy permissive `client_internal_write` policy (last write side-door; predated the 0016 convention). 0049 — `extend_invite` (admin-only reset of the 7-day expiry).
 - Legacy `asset` table dropped (0029).
 
 ## Approval state machine (content_item.status)
@@ -85,12 +85,8 @@ Agency drives draft→internal_review→client_review. Client view can approve (
 - **UI foundation** — design tokens + shared control constants (`components/ui.ts`, `globals.css @theme`), Geist, route-level loading skeleton + error boundary, dialog a11y + entrance motion.
 
 ## Next (open)
-1. **Retainer visibility decision** — `client_internal.retainer_amount` is readable by every agency member while `cost_per_hour` is admin-only (0047). If retainers are sensitive, relocate them the same way.
-2. **Timesheet privacy decision** — `time_entry` is readable by all agency members (0044). Confirm that's intended or gate non-own rows to admins.
-3. **Notification spine, phase 2** — `notification_preference` table + email via Resend (needs the verified Mood domain); auto-chase for posts stuck in client_review.
-4. **Invite QoL** — no extend/resend for the 7-day expiry (0035); admin must delete + recreate.
-5. **Friendly RPC errors** — server actions pass `error.message` straight to the UI; map known SQLSTATEs to human copy.
-6. Month-view media indicator (week card has thumbnails; month chips don't) — optional.
+1. **Notification spine, phase 2** — `notification_preference` table + email via Resend (**blocked on the verified Mood domain**); auto-chase for posts stuck in client_review.
+2. Optional UI polish: toast for action feedback (errors are inline text today), focus-trap in dialogs (Escape works, Tab can wander), empty states with a call-to-action for first-run lists.
 
 ## Conventions / preferences
 - British English. Write like a person; avoid AI-tell phrasing. Lean and direct — no padded comments or over-engineering.

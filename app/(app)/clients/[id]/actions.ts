@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -53,7 +54,7 @@ export async function updateClientAction(
     p_retainer_amount: retainer,
   })
 
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath('/clients')
   revalidatePath(`/clients/${clientId}`)
@@ -75,7 +76,7 @@ export async function deleteClientAction(
   if (!clientId) return { error: 'Missing client id.', ok: false }
 
   const { error } = await supabase.rpc('delete_client', { p_id: clientId })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath('/clients')
   redirect('/clients')

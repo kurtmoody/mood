@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -16,7 +17,7 @@ export async function setMemberRoleAction(targetUserId: string, agencyId: string
     p_agency_id: agencyId,
     p_role: role,
   })
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
   revalidatePath('/admin/access')
   return { error: null }
 }

@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -30,7 +31,7 @@ export async function addTeamMemberAction(
     p_email: str('email'),
   })
 
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath('/team')
   return { error: null, ok: true }
@@ -64,7 +65,7 @@ export async function updateTeamMemberAction(
     p_is_active: formData.get('is_active') === 'true',
   })
 
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath('/team')
   return { error: null, ok: true }
@@ -87,7 +88,7 @@ export async function setTeamMemberActiveAction(
     p_is_active: formData.get('is_active') === 'true',
   })
 
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath('/team')
   return { error: null, ok: true }
@@ -115,7 +116,7 @@ export async function deleteTeamMemberAction(
     p_successor_id: successor,
   })
 
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath('/team')
   return { error: null, ok: true }

@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -30,7 +31,7 @@ export async function setClientOwnershipAction(_prev: OwnershipState, fd: FormDa
     p_sales_ops_id: str(fd, 'sales_ops_id'),
     p_intern_support_id: str(fd, 'intern_support_id'),
   })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath(`/clients/${clientId}`)
   revalidatePath('/clients/ownership')

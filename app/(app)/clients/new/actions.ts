@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { fallbackColour } from '@/lib/colour'
 import { revalidatePath } from 'next/cache'
@@ -50,7 +51,7 @@ export async function createClientAction(
     p_retainer_amount: retainer,
   })
 
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
 
   revalidatePath('/clients')
   redirect('/clients')

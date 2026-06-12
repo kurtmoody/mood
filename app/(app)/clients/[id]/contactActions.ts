@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -29,7 +30,7 @@ export async function setPortalAccessAction(_prev: ContactState, fd: FormData): 
     p_contact_id: contactId,
     p_enabled: enabled,
   })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   if (clientId) revalidatePath(`/clients/${clientId}`)
   return { error: null, ok: true }
@@ -51,7 +52,7 @@ export async function addContactAction(_prev: ContactState, fd: FormData): Promi
     p_phone: str(fd, 'phone'),
     p_is_primary: fd.get('is_primary') === 'on',
   })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath(`/clients/${clientId}`)
   return { error: null, ok: true }
@@ -74,7 +75,7 @@ export async function updateContactAction(_prev: ContactState, fd: FormData): Pr
     p_phone: str(fd, 'phone'),
     p_is_primary: fd.get('is_primary') === 'on',
   })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   if (clientId) revalidatePath(`/clients/${clientId}`)
   return { error: null, ok: true }
@@ -87,7 +88,7 @@ export async function deleteContactAction(_prev: ContactState, fd: FormData): Pr
   if (!contactId) return { error: 'Missing contact id.', ok: false }
 
   const { error } = await supabase.rpc('delete_contact', { p_contact_id: contactId })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   if (clientId) revalidatePath(`/clients/${clientId}`)
   return { error: null, ok: true }

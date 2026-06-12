@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -29,7 +30,7 @@ export async function createPostAction(_prev: PostState, fd: FormData): Promise<
     p_scheduled_at: scheduledAt,
     p_body: str(fd, 'body'),
   })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath('/')
   return { error: null, ok: true }
@@ -51,7 +52,7 @@ export async function reschedulePostAction(
     p_scheduled_at: scheduledAtISO,
     p_mark_posted: markPosted,
   })
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
 
   revalidatePath('/')
   return { error: null }
@@ -88,7 +89,7 @@ export async function setPostMetaAction(
     p_date_posted: meta.date_posted,
     p_posted_url: meta.posted_url,
   })
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
   revalidatePath('/')
   return { error: null }
 }
@@ -108,7 +109,7 @@ export async function updatePostAction(_prev: PostState, fd: FormData): Promise<
     p_scheduled_at: str(fd, 'scheduled_at'), // ISO string, converted client-side
     p_body: str(fd, 'body'),
   })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   // (a) Fork media copies: a frozen-status edit forks v2 and returns the
   // {old_path,new_path} pairs for its media; copy each storage object to the new

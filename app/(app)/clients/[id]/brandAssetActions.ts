@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -34,7 +35,7 @@ export async function addBrandAssetAction(_prev: BrandAssetState, fd: FormData):
     p_value: str(fd, 'value'),
     p_notes: str(fd, 'notes'),
   })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath(`/clients/${clientId}`)
   return { error: null, ok: true }
@@ -47,7 +48,7 @@ export async function deleteBrandAssetAction(_prev: BrandAssetState, fd: FormDat
   if (!assetId) return { error: 'Missing asset id.', ok: false }
 
   const { error } = await supabase.rpc('delete_brand_asset', { p_asset_id: assetId })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   if (clientId) revalidatePath(`/clients/${clientId}`)
   return { error: null, ok: true }

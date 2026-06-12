@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -60,20 +61,20 @@ function done(): TaskResult {
 export async function createTaskAction(input: TaskInput): Promise<TaskResult> {
   const supabase = await authed()
   const { error } = await supabase.rpc('create_task', rpcParams(input))
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
   return done()
 }
 
 export async function updateTaskAction(taskId: string, input: TaskInput): Promise<TaskResult> {
   const supabase = await authed()
   const { error } = await supabase.rpc('update_task', { p_task_id: taskId, ...rpcParams(input) })
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
   return done()
 }
 
 export async function deleteTaskAction(taskId: string): Promise<TaskResult> {
   const supabase = await authed()
   const { error } = await supabase.rpc('delete_task', { p_task_id: taskId })
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
   return done()
 }

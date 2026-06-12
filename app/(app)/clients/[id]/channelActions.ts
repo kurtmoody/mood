@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -30,7 +31,7 @@ export async function addChannelAction(_prev: ChannelState, fd: FormData): Promi
     p_type: type,
     p_label: str(fd, 'label'),
   })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath(`/clients/${clientId}`)
   return { error: null, ok: true }
@@ -43,7 +44,7 @@ export async function deleteChannelAction(_prev: ChannelState, fd: FormData): Pr
   if (!channelId) return { error: 'Missing channel id.', ok: false }
 
   const { error } = await supabase.rpc('delete_channel', { p_channel_id: channelId })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   if (clientId) revalidatePath(`/clients/${clientId}`)
   return { error: null, ok: true }

@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
@@ -22,7 +23,7 @@ export async function setAgencyCostPerHourAction(_prev: CostState, formData: For
   }
 
   const { error } = await supabase.rpc('set_agency_cost_per_hour', { p_agency_id: agencyId, p_rate: rate })
-  if (error) return { error: error.message, ok: false }
+  if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath('/admin/costs')
   return { error: null, ok: true }

@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
@@ -13,7 +14,7 @@ export async function setClientStatusAction(
   if (!user) return { error: 'Not signed in.' }
 
   const { error } = await supabase.rpc('set_client_status', { p_client_id: clientId, p_status: status })
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
   revalidatePath('/clients')
   return { error: null }
 }
@@ -26,7 +27,7 @@ export async function deleteClientFromListAction(clientId: string): Promise<{ er
   if (!user) return { error: 'Not signed in.' }
 
   const { error } = await supabase.rpc('delete_client', { p_id: clientId })
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
   revalidatePath('/clients')
   return { error: null }
 }

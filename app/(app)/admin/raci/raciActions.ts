@@ -1,5 +1,6 @@
 'use server'
 
+import { rpcErrorMessage } from '@/lib/rpcError'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -13,7 +14,7 @@ export async function setRaciMatrixAction(agencyId: string, cells: RaciCell[]): 
   if (!user) redirect('/login')
 
   const { error } = await supabase.rpc('set_raci_matrix', { p_agency_id: agencyId, p_cells: cells })
-  if (error) return { error: error.message }
+  if (error) return { error: rpcErrorMessage(error) }
   revalidatePath('/admin/raci')
   return { error: null }
 }
