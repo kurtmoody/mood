@@ -35,7 +35,7 @@ export default async function Home({
   // explicitly to their own client(s) — defence-in-depth, no agency-wide picker.
   let clientsQuery = supabase.from('client').select('id, name, calendar_colour, status').order('name')
   if (isClient) clientsQuery = clientsQuery.in('id', access.clientIds)
-  const { data: clients } = await clientsQuery
+  const [{ data: clients }, params] = await Promise.all([clientsQuery, searchParams])
   const clientList = clients ?? []
 
   if (clientList.length === 0) {
@@ -47,7 +47,7 @@ export default async function Home({
     )
   }
 
-  const { client: requested, clients: clientsParam, week: weekParam, month: monthParam, view: viewParam, post: postParam } = await searchParams
+  const { client: requested, clients: clientsParam, week: weekParam, month: monthParam, view: viewParam, post: postParam } = params
 
   // Combined view by default = ALL the user's visible clients. ?clients= (comma list)
   // picks a subset; ?client= (single, used by deep-links) focuses one. Clients only
@@ -78,15 +78,6 @@ export default async function Home({
   const weekStartUTC = zonedDayStartUTC(rangeStartDate).toISOString()
   const weekEndUTC = zonedDayStartUTC(rangeEndDate).toISOString()
 
-  // All channels for the user's clients, grouped — powers the New post form's channel picker.
-  const { data: allChannels } = await supabase
-    .from('channel')
-    .select('id, type, label, client_id')
-  const channelsByClient: Record<string, Channel[]> = {}
-  for (const ch of allChannels ?? []) {
-    ;(channelsByClient[ch.client_id] ??= []).push({ id: ch.id, type: ch.type, label: ch.label })
-  }
-
   // RLS already restricts client users to client_review+ posts; the explicit
   // status filter is defence-in-depth and helps the query planner.
   let itemsQuery = supabase
@@ -96,11 +87,20 @@ export default async function Home({
     .gte('scheduled_at', weekStartUTC)
     .lt('scheduled_at', weekEndUTC)
   if (isClient) itemsQuery = itemsQuery.in('status', CLIENT_VISIBLE_STATUSES)
-  const { data: items, error } = await itemsQuery.order('scheduled_at')
+
+  // Channels (New post form picker), the visible range's posts and the team directory
+  // (approval-event actor names) are independent — one parallel round.
+  const [{ data: allChannels }, { data: items, error }, { data: team }] = await Promise.all([
+    supabase.from('channel').select('id, type, label, client_id'),
+    itemsQuery.order('scheduled_at'),
+    supabase.from('team_member').select('full_name, user_id'),
+  ])
   if (error) console.error('content_item query failed:', error.message, error.code)
 
-  // Resolve approval-event actors to team-member names.
-  const { data: team } = await supabase.from('team_member').select('full_name, user_id')
+  const channelsByClient: Record<string, Channel[]> = {}
+  for (const ch of allChannels ?? []) {
+    ;(channelsByClient[ch.client_id] ??= []).push({ id: ch.id, type: ch.type, label: ch.label })
+  }
   const nameByUser = new Map<string, string>()
   for (const t of team ?? []) if (t.user_id) nameByUser.set(t.user_id, t.full_name)
 

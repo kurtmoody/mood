@@ -19,23 +19,27 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   if (!access) redirect('/login')
   if (access.type !== 'agency') redirect('/') // internal-only
 
-  // RLS scopes task to the agency; single-FK embeds (client/owner/content) are unambiguous.
-  const { data: tasks, error } = await supabase
-    .from('task')
-    .select('id, client_id, content_item_id, task_type, title, owner_id, status, priority, due_date, next_action, notes, estimated_hours, start_date, value, value_client_visible, invoice_status, client:client_id ( name, calendar_colour, status ), owner:owner_id ( full_name ), content:content_item_id ( id, title, client_id, scheduled_at )')
-    .order('created_at', { ascending: false })
+  // ?forPost=<content_item_id> → open the create modal pre-filled for that post.
+  // ?view / ?owner / ?status seed the view + filters (shareable, dashboard deep-links).
+  const { forPost, view, owner, status, client } = await searchParams
+
+  // All independent — one parallel round. RLS scopes task to the agency; single-FK
+  // embeds (client/owner/content) are unambiguous.
+  const [{ data: tasks, error }, { data: team }, { data: clients }, { data: ownership }, { data: viewPref }, { data: prefillPost }] = await Promise.all([
+    supabase
+      .from('task')
+      .select('id, client_id, content_item_id, task_type, title, owner_id, status, priority, due_date, next_action, notes, estimated_hours, start_date, value, value_client_visible, invoice_status, client:client_id ( name, calendar_colour, status ), owner:owner_id ( full_name ), content:content_item_id ( id, title, client_id, scheduled_at )')
+      .order('created_at', { ascending: false }),
+    supabase.from('team_member').select('id, full_name, user_id').eq('is_active', true).order('full_name'),
+    supabase.from('client').select('id, name, calendar_colour').order('name'),
+    supabase.from('client_ownership').select('client_id, lead_pm_id'),
+    // This user's column preference for the task list (own-row read under RLS).
+    supabase.from('user_view_preference').select('config').eq('view_key', 'tasks').maybeSingle(),
+    forPost
+      ? supabase.from('content_item').select('id, title, client_id').eq('id', forPost).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
   if (error) console.error('tasks query failed:', error.message, error.code)
-
-  const { data: team } = await supabase.from('team_member').select('id, full_name, user_id').eq('is_active', true).order('full_name')
-  const { data: clients } = await supabase.from('client').select('id, name, calendar_colour').order('name')
-  const { data: ownership } = await supabase.from('client_ownership').select('client_id, lead_pm_id')
-
-  // This user's column preference for the task list (own-row read under RLS).
-  const { data: viewPref } = await supabase
-    .from('user_view_preference')
-    .select('config')
-    .eq('view_key', 'tasks')
-    .maybeSingle()
 
   const leadPmByClient: Record<string, string | null> = {}
   for (const o of ownership ?? []) leadPmByClient[(o as any).client_id] = (o as any).lead_pm_id
@@ -65,14 +69,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     archived: t.client?.status === 'archived',
   }))
 
-  // ?forPost=<content_item_id> → open the create modal pre-filled for that post.
-  // ?view / ?owner / ?status seed the view + filters (shareable, dashboard deep-links).
-  const { forPost, view, owner, status, client } = await searchParams
-  let prefill: { contentItemId: string; clientId: string | null; postTitle: string } | null = null
-  if (forPost) {
-    const { data: post } = await supabase.from('content_item').select('id, title, client_id').eq('id', forPost).maybeSingle()
-    if (post) prefill = { contentItemId: post.id, clientId: post.client_id, postTitle: post.title ?? 'Untitled' }
-  }
+  const prefill = prefillPost
+    ? { contentItemId: prefillPost.id, clientId: prefillPost.client_id, postTitle: prefillPost.title ?? 'Untitled' }
+    : null
   const initialView = view === 'kanban' || view === 'calendar' ? view : 'list'
 
   return (

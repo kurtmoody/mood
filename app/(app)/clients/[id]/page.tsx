@@ -28,66 +28,57 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const [{ data: { user } }, { data: agencyMemberships }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from('membership').select('scope_id, role').eq('scope_type', 'agency'),
+  ])
   if (!user) redirect('/login')
-
-  const { data: agencyMemberships } = await supabase
-    .from('membership')
-    .select('scope_id, role')
-    .eq('scope_type', 'agency')
   if (!agencyMemberships?.length) redirect('/')
   const isAdmin = agencyMemberships.some((m) => m.role === 'agency_admin')
 
-  const { data: client } = await supabase
-    .from('client')
-    .select('id, name, status, website, industry, timezone, brand_colour, calendar_colour, timesheet_enabled, client_internal ( account_owner_id, notes, billing_email, vat_number, billing_address, payment_terms, currency, retainer_amount )')
-    .eq('id', id)
-    .maybeSingle()
+  // Everything below only needs the route id — fetch in one parallel round.
+  const [
+    { data: client },
+    { data: team },
+    { data: channels },
+    { data: contacts },
+    { data: assets },
+    { data: ownership },
+    { data: invites },
+  ] = await Promise.all([
+    supabase
+      .from('client')
+      .select('id, name, status, website, industry, timezone, brand_colour, calendar_colour, timesheet_enabled, client_internal ( account_owner_id, notes, billing_email, vat_number, billing_address, payment_terms, currency, retainer_amount )')
+      .eq('id', id)
+      .maybeSingle(),
+    // Assignment dropdowns (account owner + ownership roles) — active members only.
+    supabase.from('team_member').select('id, full_name').eq('is_active', true).order('full_name'),
+    supabase.from('channel').select('id, type, label').eq('client_id', id).order('type'),
+    supabase
+      .from('client_contact')
+      .select('id, first_name, surname, role, email, phone, is_primary, portal_access')
+      .eq('client_id', id)
+      .order('is_primary', { ascending: false })
+      .order('first_name'),
+    supabase.from('brand_asset').select('id, kind, label, value, notes').eq('client_id', id).order('kind'),
+    supabase
+      .from('client_ownership')
+      .select('lead_pm_id, comms_backup_id, creative_lead_id, design_owner_id, content_owner_id, video_owner_id, sales_ops_id, intern_support_id')
+      .eq('client_id', id)
+      .maybeSingle(),
+    supabase
+      .from('invite')
+      .select('id, email, role, created_at, expires_at')
+      .eq('scope_type', 'client')
+      .eq('scope_id', id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false }),
+  ])
 
   if (!client) redirect('/clients')
 
   const ciRaw = (client as { client_internal: Internal | Internal[] | null }).client_internal
   const ci = (Array.isArray(ciRaw) ? ciRaw[0] : ciRaw) ?? null
-
-  // Assignment dropdowns (account owner + ownership roles) — active members only.
-  const { data: team } = await supabase
-    .from('team_member')
-    .select('id, full_name')
-    .eq('is_active', true)
-    .order('full_name')
-
-  const { data: channels } = await supabase
-    .from('channel')
-    .select('id, type, label')
-    .eq('client_id', id)
-    .order('type')
-
-  const { data: contacts } = await supabase
-    .from('client_contact')
-    .select('id, first_name, surname, role, email, phone, is_primary, portal_access')
-    .eq('client_id', id)
-    .order('is_primary', { ascending: false })
-    .order('first_name')
-
-  const { data: assets } = await supabase
-    .from('brand_asset')
-    .select('id, kind, label, value, notes')
-    .eq('client_id', id)
-    .order('kind')
-
-  const { data: ownership } = await supabase
-    .from('client_ownership')
-    .select('lead_pm_id, comms_backup_id, creative_lead_id, design_owner_id, content_owner_id, video_owner_id, sales_ops_id, intern_support_id')
-    .eq('client_id', id)
-    .maybeSingle()
-
-  const { data: invites } = await supabase
-    .from('invite')
-    .select('id, email, role, created_at, expires_at')
-    .eq('scope_type', 'client')
-    .eq('scope_id', id)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false })
 
   const defaults: ClientDefaults = {
     name: client.name,
