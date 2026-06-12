@@ -59,10 +59,10 @@ export default async function Home({
     : requested && visibleIds.includes(requested) ? [requested]
     : visibleIds
 
-  // 'grid' (agency content tracker) is month-scoped — same query/source as the calendar.
-  // A client can't reach the grid (CalendarBoard renders the month calendar as fallback).
-  const view: 'week' | 'month' | 'grid' =
-    viewParam === 'month' ? 'month' : viewParam === 'grid' && isAgency ? 'grid' : viewParam === 'week' ? 'week' : 'week'
+  // 'table' (agency content tracker, formerly 'grid' — old links still work) is
+  // month-scoped — same query/source as the calendar. A client can't reach it.
+  const view: 'week' | 'month' | 'table' =
+    viewParam === 'month' ? 'month' : (viewParam === 'table' || viewParam === 'grid') && isAgency ? 'table' : 'week'
   const todayStr = todayMalta()
 
   // Both anchors are tracked independently so each view keeps its own position.
@@ -88,12 +88,14 @@ export default async function Home({
     .lt('scheduled_at', weekEndUTC)
   if (isClient) itemsQuery = itemsQuery.in('status', CLIENT_VISIBLE_STATUSES)
 
-  // Channels (New post form picker), the visible range's posts and the team directory
-  // (approval-event actor names) are independent — one parallel round.
-  const [{ data: allChannels }, { data: items, error }, { data: team }] = await Promise.all([
+  // Channels (New post form picker), the visible range's posts, the team directory
+  // (approval-event actor names) and the user's table column prefs are independent —
+  // one parallel round.
+  const [{ data: allChannels }, { data: items, error }, { data: team }, { data: viewPref }] = await Promise.all([
     supabase.from('channel').select('id, type, label, client_id'),
     itemsQuery.order('scheduled_at'),
     supabase.from('team_member').select('full_name, user_id'),
+    supabase.from('user_view_preference').select('config').eq('view_key', 'content_table').maybeSingle(),
   ])
   if (error) console.error('content_item query failed:', error.message, error.code)
 
@@ -200,6 +202,7 @@ export default async function Home({
         isAgency={isAgency}
         openPostId={postParam ?? null}
         loadError={!!error}
+        savedColumns={(viewPref?.config as { key: string; hidden: boolean }[] | null) ?? null}
       />
     </PageContainer>
   )

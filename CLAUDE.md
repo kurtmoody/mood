@@ -81,7 +81,8 @@ Agency drives draft→internal_review→client_review. Client view can approve (
 - **Client portal** — access model + invite toggle (0013), claim-on-login (callback → `claim_client_access`), restricted client calendar + nav gating, client approve/request-changes in the drawer (`transition_post`, 0017), invite panel (0035).
 - **Tasks** — list/kanban/calendar board with filters, column preferences, owner/client/status deep-links; tasks can serve a post; capacity fields + job value.
 - **Notifications (in-app)** — bell + inbox, emitted from the RPC write paths. No email channel or preferences yet.
-- **Reporting (admin)** — dashboard ("needs your action"), capacity planner, profitability report (timesheets × flat agency cost rate × job value), grid/production tracker view.
+- **Reporting (admin)** — dashboard ("needs your action"), capacity planner, profitability report (timesheets × flat agency cost rate × job value).
+- **Table view** (calendar's third toggle, formerly "Grid"; `?view=table`, legacy `grid` links still parse) — all post fields incl. thumbnail, caption (read-only — caption edits stay in the drawer because they're versioned), production meta, derived PM; group-by selector (`?group=` client/pm/designer/status/platform/none), per-user column picker (view_key `content_table`), CSV export of the visible period.
 - **UI foundation** — design tokens + shared control constants (`components/ui.ts`, `globals.css @theme`), Geist, route-level loading skeleton + error boundary, dialog a11y + entrance motion.
 
 ## Next (open)

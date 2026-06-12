@@ -1,5 +1,5 @@
 'use client'
-import { Link2 } from 'lucide-react'
+import { Check, Link2, Zap } from 'lucide-react'
 import { maltaDate } from '@/lib/week'
 import { textOn } from '@/lib/colour'
 import MediaThumb from './MediaThumb'
@@ -189,7 +189,11 @@ export default function Calendar({
                   <div className="flex items-center gap-1.5 text-[11px]" style={{ opacity: 0.9 }}>
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.dot, boxShadow: `0 0 0 1.5px ${ring}` }} />
                     {s.label}
-                    {it.asset_links && it.asset_links.length > 0 && <Link2 size={12} aria-label="Has asset links" className="ml-auto shrink-0" />}
+                    <span className="ml-auto flex items-center gap-1 shrink-0">
+                      {it.boost && <Zap size={12} aria-label="Boosted" />}
+                      {(it.status === 'posted' || it.date_posted) && <Check size={12} aria-label="Posted" />}
+                      {it.asset_links && it.asset_links.length > 0 && <Link2 size={12} aria-label="Has asset links" />}
+                    </span>
                   </div>
                 </button>
               )

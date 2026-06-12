@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Calendar, { STATUS, type Item } from '@/components/Calendar'
 import MonthCalendar from '@/components/MonthCalendar'
-import ContentGrid from '@/components/ContentGrid'
+import ContentGrid, { GROUP_OPTIONS, type GroupBy } from '@/components/ContentGrid'
+import type { ColumnConfig } from '@/lib/viewColumns'
 import FilterMenu from '@/components/FilterMenu'
 import Drawer from '@/components/Drawer'
 import NewPostForm from './NewPostForm'
@@ -31,13 +32,14 @@ export default function CalendarBoard({
   isAgency,
   openPostId,
   loadError,
+  savedColumns,
 }: {
   clients: ClientOption[]
   selectedClientIds: string[]
   defaultClientId: string
   channelsByClient: Record<string, Channel[]>
   posts: Item[]
-  view: 'week' | 'month' | 'grid'
+  view: 'week' | 'month' | 'table'
   monday: string
   month: string
   todayStr: string
@@ -45,9 +47,20 @@ export default function CalendarBoard({
   isAgency: boolean
   openPostId: string | null
   loadError: boolean
+  savedColumns: ColumnConfig[] | null
 }) {
   const router = useRouter()
   const params = useSearchParams()
+
+  // Table grouping lives in the URL (?group=) like the rest of the view state.
+  const groupParam = params.get('group')
+  const groupBy: GroupBy = GROUP_OPTIONS.some((o) => o.value === groupParam) ? (groupParam as GroupBy) : 'client'
+  function setGroupBy(g: GroupBy) {
+    const sp = new URLSearchParams(params.toString())
+    if (g === 'client') sp.delete('group')
+    else sp.set('group', g)
+    router.push(`/?${sp.toString()}`)
+  }
   const [selected, setSelected] = useState<Item | null>(null)
   const [formDate, setFormDate] = useState<string | null>(null)
 
@@ -181,7 +194,7 @@ export default function CalendarBoard({
     router.push(`/?${sp.toString()}`)
   }
 
-  // month + grid both navigate by month; week navigates by week. Current view preserved.
+  // month + table both navigate by month; week navigates by week. Current view preserved.
   function prev() {
     if (view === 'week') go({ view: 'week', week: addDays(monday, -7) })
     else go({ view, month: addMonths(month, -1) })
@@ -223,10 +236,10 @@ export default function CalendarBoard({
             {tab('month', 'Month')}
             {isAgency && (
               <button
-                onClick={() => go({ view: 'grid', month })}
-                className={`px-3 py-2 ${view === 'grid' ? 'bg-[#15171C] text-white font-semibold' : 'text-[#5A5E66] hover:bg-[#F4F4F6]'}`}
+                onClick={() => go({ view: 'table', month })}
+                className={`px-3 py-2 ${view === 'table' ? 'bg-[#15171C] text-white font-semibold' : 'text-[#5A5E66] hover:bg-[#F4F4F6]'}`}
               >
-                Grid
+                Table
               </button>
             )}
           </div>
@@ -318,8 +331,16 @@ export default function CalendarBoard({
         <div className="mb-4 rounded-lg border border-[#E0572E]/30 bg-[#E0572E]/5 px-4 py-2.5 text-sm text-[#E0572E]">{actionError}</div>
       )}
 
-      {view === 'grid' && isAgency ? (
-        <ContentGrid posts={filtered} clients={visibleClients} onSelect={setSelected} />
+      {view === 'table' && isAgency ? (
+        <ContentGrid
+          posts={filtered}
+          clients={visibleClients}
+          onSelect={setSelected}
+          groupBy={groupBy}
+          onGroupByChange={setGroupBy}
+          savedColumns={savedColumns}
+          month={month}
+        />
       ) : view === 'week' ? (
         <Calendar
           items={filtered}
