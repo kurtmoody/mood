@@ -45,9 +45,9 @@ export default function NewPostForm({
   const iso = when ? new Date(when).toISOString() : ''
 
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-full max-w-[480px] bg-white border-l border-[#ECECEE] shadow-xl flex flex-col">
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="New post">
+      <div className="absolute inset-0 bg-black/20 animate-overlay-in" onClick={onClose} />
+      <div className="absolute right-0 top-0 h-full w-full max-w-[480px] bg-white border-l border-[#ECECEE] shadow-xl flex flex-col animate-panel-in">
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#ECECEE]">
           <h2 className="text-lg font-bold">New post</h2>
           <button

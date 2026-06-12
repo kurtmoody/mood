@@ -156,8 +156,8 @@ function DeleteModal({
   }, [state.ok, onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 animate-overlay-in" role="dialog" aria-modal="true" aria-label={`Delete ${member.full_name} permanently`} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white border border-[#ECECEE] shadow-xl p-6 animate-pop-in" onClick={(e) => e.stopPropagation()}>
         <div className="text-sm font-semibold mb-2">Delete {member.full_name} permanently</div>
         <p className="text-sm text-[#5A5E66] mb-4">
           This permanently deletes {member.full_name} and reassigns their tasks, ownership and RACI to the chosen
@@ -201,8 +201,8 @@ function EditModal({ member, onClose }: { member: Member; onClose: () => void })
   }, [state.ok, onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 animate-overlay-in" role="dialog" aria-modal="true" aria-label="Edit team member" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white border border-[#ECECEE] shadow-xl p-6 animate-pop-in" onClick={(e) => e.stopPropagation()}>
         <div className="text-sm font-semibold mb-4">Edit team member</div>
         <form action={action} className="flex flex-col gap-3">
           <input type="hidden" name="id" value={member.id} />

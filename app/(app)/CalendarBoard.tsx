@@ -401,9 +401,9 @@ function RescheduleConfirm({
     weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
   })
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center p-4">
-      <div className="absolute inset-0 bg-black/20" onClick={onCancel} />
-      <div className="relative w-full max-w-sm bg-white border border-[#ECECEE] rounded-2xl shadow-xl p-5">
+    <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-label="Move to a past date?">
+      <div className="absolute inset-0 bg-black/20 animate-overlay-in" onClick={onCancel} />
+      <div className="relative w-full max-w-sm bg-white border border-[#ECECEE] rounded-2xl shadow-xl p-5 animate-pop-in">
         <div className="text-sm font-semibold mb-1">Move to a past date?</div>
         <p className="text-sm text-[#5A5E66] mb-4">You&rsquo;re moving this post to <span className="font-medium text-[#15171C]">{nice}</span>, which is in the past.</p>
         {eligible && (

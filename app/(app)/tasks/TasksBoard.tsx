@@ -123,9 +123,9 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center p-4">
-      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white border border-[#ECECEE] rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-label={task ? 'Edit task' : 'New task'}>
+      <div className="absolute inset-0 bg-black/20 animate-overlay-in" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-white border border-[#ECECEE] rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-y-auto animate-pop-in">
         <div className="text-sm font-semibold mb-1">{task ? 'Edit task' : 'New task'}</div>
         {servesLabel && <div className="text-xs text-[#9398A1] mb-3">Serves post: <span className="text-[#5A5E66]">{servesLabel}</span></div>}
         <div className="grid grid-cols-2 gap-3 mt-3">

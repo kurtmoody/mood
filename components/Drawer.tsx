@@ -261,9 +261,9 @@ export default function Drawer({
   const editableAsFork = isAgency && !EDITABLE.has(item.status)   // frozen: edit forks a new version
 
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-full max-w-[440px] bg-white border-l border-[#ECECEE] shadow-xl flex flex-col">
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={item.title ?? 'Post details'}>
+      <div className="absolute inset-0 bg-black/20 animate-overlay-in" onClick={onClose} />
+      <div className="absolute right-0 top-0 h-full w-full max-w-[440px] bg-white border-l border-[#ECECEE] shadow-xl flex flex-col animate-panel-in">
         <div className="flex items-start justify-between gap-3 px-6 py-5 border-b border-[#ECECEE]">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold capitalize mb-1">{channel}</div>

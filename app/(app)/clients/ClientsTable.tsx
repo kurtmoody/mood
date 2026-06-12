@@ -144,8 +144,8 @@ export default function ClientsTable({ rows, isAdmin }: { rows: Client[]; isAdmi
 
 function ArchiveConfirm({ client, busy, onCancel, onConfirm }: { client: Client; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onCancel}>
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 animate-overlay-in" role="dialog" aria-modal="true" aria-label={`Archive ${client.name}?`} onClick={onCancel}>
+      <div className="w-full max-w-sm rounded-2xl bg-white border border-[#ECECEE] shadow-xl p-6 animate-pop-in" onClick={(e) => e.stopPropagation()}>
         <div className="text-sm font-semibold mb-2">Archive {client.name}?</div>
         <p className="text-sm text-[#5A5E66] mb-4">They&rsquo;ll be hidden from the active list. You can reactivate any time.</p>
         <div className="flex items-center justify-end gap-2">
@@ -184,8 +184,8 @@ function DeleteModal({ client, onClose, onDeleted }: { client: Client; onClose: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 animate-overlay-in" role="dialog" aria-modal="true" aria-label={`Delete ${client.name} permanently`} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white border border-[#ECECEE] shadow-xl p-6 animate-pop-in" onClick={(e) => e.stopPropagation()}>
         <div className="text-sm font-semibold mb-2">Delete {client.name} permanently</div>
 
         {/* Step 1 — back up first. */}

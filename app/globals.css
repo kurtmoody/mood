@@ -1,26 +1,88 @@
 @import "tailwindcss";
 
+/* Design tokens — single source of truth for the palette already used across the app.
+   New code should prefer the semantic utilities these generate (text-ink, text-muted,
+   border-line, bg-surface, …) over raw hex values. Light theme only, by design. */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #15171c;
 }
 
-@theme inline {
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --color-ink: #15171c;        /* primary text, solid buttons */
+  --color-muted: #5a5e66;      /* secondary text */
+  --color-faint: #9398a1;      /* labels, placeholders, icons */
+  --color-line: #ececee;       /* hairline borders */
+  --color-line-strong: #e2e2e5;/* input borders */
+  --color-surface: #fbfbfc;    /* app canvas */
+  --color-hover: #f4f4f6;      /* hover fills */
+  --color-accent: #e0572e;     /* alerts, danger, badges */
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --animate-overlay-in: overlay-in 0.15s ease-out;
+  --animate-panel-in: panel-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-pop-in: pop-in 0.15s ease-out;
+
+  @keyframes overlay-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes panel-in {
+    from { transform: translateX(24px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes pop-in {
+    from { transform: translateY(2px) scale(0.98); opacity: 0; }
+    to { transform: none; opacity: 1; }
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+}
+
+@layer base {
+  /* Keyboard-only focus ring, app-wide. Pointer interactions stay clean. */
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Smooth state changes on every interactive element without per-component classes. */
+  button,
+  [role="button"],
+  a,
+  input,
+  select,
+  textarea {
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease,
+      box-shadow 0.15s ease,
+      opacity 0.15s ease;
+  }
+
+  ::placeholder {
+    color: var(--color-faint);
+  }
+
+  ::selection {
+    background: var(--color-ink);
+    color: #fff;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #d7d8dc transparent;
+  }
 }

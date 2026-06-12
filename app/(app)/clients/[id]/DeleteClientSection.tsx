@@ -60,8 +60,8 @@ function DeleteModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 animate-overlay-in" role="dialog" aria-modal="true" aria-label={`Delete ${clientName} permanently`} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white border border-[#ECECEE] shadow-xl p-6 animate-pop-in" onClick={(e) => e.stopPropagation()}>
         <div className="text-sm font-semibold mb-2">Delete {clientName} permanently</div>
 
         {/* Step 1 — back up first. */}
