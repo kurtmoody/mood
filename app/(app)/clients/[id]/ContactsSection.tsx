@@ -8,6 +8,7 @@ import {
   setPortalAccessAction,
   type ContactState,
 } from './contactActions'
+import { labelCls, fieldCls, btnPrimary, btnGhost } from '@/components/ui'
 
 export type Contact = {
   id: string
@@ -21,8 +22,6 @@ export type Contact = {
 }
 
 const initial: ContactState = { error: null, ok: false }
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white'
-const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
 
 function fullName(c: Contact) {
   return [c.first_name, c.surname].filter(Boolean).join(' ') || '—'
@@ -74,7 +73,7 @@ function AddContactForm({ clientId }: { clientId: string }) {
         <button
           type="submit"
           disabled={pending}
-          className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          className={btnPrimary}
         >
           {pending ? 'Adding…' : 'Add contact'}
         </button>
@@ -97,11 +96,11 @@ function EditContactForm({ contact, clientId, onDone }: { contact: Contact; clie
         <button
           type="submit"
           disabled={pending}
-          className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          className={btnPrimary}
         >
           {pending ? 'Saving…' : 'Save'}
         </button>
-        <button type="button" onClick={onDone} className="text-sm text-[#5A5E66] rounded-lg px-3 py-2 hover:bg-[#F4F4F6]">
+        <button type="button" onClick={onDone} className={btnGhost}>
           Cancel
         </button>
       </div>

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from 'react'
 import { createInviteAction, revokeInviteAction, type InviteState } from './inviteActions'
+import { labelCls, fieldCls, btnPrimary } from '@/components/ui'
 
 export type Invite = {
   id: string
@@ -12,8 +13,6 @@ export type Invite = {
 }
 
 const initial: InviteState = { error: null, ok: false }
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white'
-const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
 
 const ROLE_LABEL: Record<string, string> = {
   agency_member: 'Team member',
@@ -69,7 +68,7 @@ export default function InvitePanel({
         <button
           type="submit"
           disabled={pending}
-          className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          className={btnPrimary}
         >
           {pending ? 'Sending…' : 'Send invite'}
         </button>

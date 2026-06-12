@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { setAgencyCostPerHourAction, type CostState } from './costActions'
+import { btnPrimary } from '@/components/ui'
 
 const initial: CostState = { error: null, ok: false }
 
@@ -28,7 +29,7 @@ export default function CostEditor({ agencyId, current }: { agencyId: string; cu
         <button
           type="submit"
           disabled={pending}
-          className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          className={btnPrimary}
         >
           {pending ? 'Saving…' : 'Save'}
         </button>

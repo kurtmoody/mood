@@ -4,6 +4,7 @@ import { useActionState } from 'react'
 import Link from 'next/link'
 import { updateClientAction, type FormState } from './actions'
 import ClientFormFields, { type ClientDefaults, type TeamOption } from '../ClientFormFields'
+import { btnPrimary } from '@/components/ui'
 
 const initial: FormState = { error: null, ok: false }
 
@@ -29,7 +30,7 @@ export default function EditClientForm({
         <button
           type="submit"
           disabled={pending}
-          className="bg-[#15171C] text-white rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+          className={btnPrimary}
         >
           {pending ? 'Saving…' : 'Save changes'}
         </button>

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { MoreHorizontal } from 'lucide-react'
 import { setClientStatusAction, deleteClientFromListAction } from './clientListActions'
 import { exportClientBundle } from '@/lib/exportClient'
+import { btnPrimary, btnDanger, btnGhost } from '@/components/ui'
 
 type Contact = { first_name: string | null; surname: string | null; email: string | null }
 export type Client = {
@@ -149,8 +150,8 @@ function ArchiveConfirm({ client, busy, onCancel, onConfirm }: { client: Client;
         <div className="text-sm font-semibold mb-2">Archive {client.name}?</div>
         <p className="text-sm text-[#5A5E66] mb-4">They&rsquo;ll be hidden from the active list. You can reactivate any time.</p>
         <div className="flex items-center justify-end gap-2">
-          <button onClick={onCancel} className="text-sm text-[#5A5E66] rounded-lg px-4 py-2 font-medium hover:bg-[#FBFBFC]">Cancel</button>
-          <button onClick={onConfirm} disabled={busy} className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          <button onClick={onCancel} className={btnGhost}>Cancel</button>
+          <button onClick={onConfirm} disabled={busy} className={btnPrimary}>
             {busy ? 'Archiving…' : 'Archive'}
           </button>
         </div>
@@ -214,8 +215,8 @@ function DeleteModal({ client, onClose, onDeleted }: { client: Client; onClose: 
         />
         {deleteError && <p className="text-sm text-red-600 mb-3">{deleteError}</p>}
         <div className="flex items-center justify-end gap-2">
-          <button onClick={onClose} className="text-sm text-[#5A5E66] rounded-lg px-4 py-2 font-medium hover:bg-[#FBFBFC]">Cancel</button>
-          <button onClick={onDelete} disabled={!canDelete || deleting} className="bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          <button onClick={onClose} className={btnGhost}>Cancel</button>
+          <button onClick={onDelete} disabled={!canDelete || deleting} className={btnDanger}>
             {deleting ? 'Deleting…' : 'Delete permanently'}
           </button>
         </div>

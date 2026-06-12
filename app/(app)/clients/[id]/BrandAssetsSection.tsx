@@ -6,6 +6,7 @@ import {
   deleteBrandAssetAction,
   type BrandAssetState,
 } from './brandAssetActions'
+import { labelCls, fieldCls, btnPrimary } from '@/components/ui'
 
 export type BrandAsset = {
   id: string
@@ -16,8 +17,6 @@ export type BrandAsset = {
 }
 
 const initial: BrandAssetState = { error: null, ok: false }
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white'
-const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
 
 const KIND_LABEL: Record<string, string> = {
   logo: 'Logo', colour: 'Colour', font: 'Font', guideline: 'Guideline', other: 'Other',
@@ -85,7 +84,7 @@ function AddBrandAssetForm({ clientId }: { clientId: string }) {
         <button
           type="submit"
           disabled={pending}
-          className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          className={btnPrimary}
         >
           {pending ? 'Adding…' : 'Add asset'}
         </button>

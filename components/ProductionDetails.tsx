@@ -5,11 +5,9 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { setPostMetaAction } from '@/app/(app)/postActions'
 import type { Item } from './Calendar'
+import { labelCls, fieldClsSm as fieldCls, btnPrimarySm } from '@/components/ui'
 
 type TeamOpt = { id: string; full_name: string }
-
-const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-2.5 py-1.5 text-sm bg-white'
 
 // Agency-only production metadata for a post (Monday "content grid" fields). Self-contained:
 // fetches the Designer options (all active team members, incl. directory-only) and the
@@ -134,7 +132,7 @@ export default function ProductionDetails({ item, clientId }: { item: Item; clie
         </div>
       </div>
       <div className="flex items-center gap-3 mt-3">
-        <button onClick={save} disabled={busy} className="bg-[#15171C] text-white rounded-lg px-3.5 py-1.5 text-sm font-semibold disabled:opacity-50 cursor-pointer">
+        <button onClick={save} disabled={busy} className={btnPrimarySm}>
           {busy ? 'Saving…' : 'Save production details'}
         </button>
         {saved && <span className="text-sm text-[#16A34A]">Saved.</span>}

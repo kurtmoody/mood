@@ -14,11 +14,11 @@ import ColumnPicker from '@/components/ColumnPicker'
 import InternalNotes from '@/components/InternalNotes'
 import TaskKanban from './TaskKanban'
 import TaskCalendar from './TaskCalendar'
+import { fieldClsSm as fieldCls, btnPrimary, btnGhost } from '@/components/ui'
 
 type Prefill = { contentItemId: string; clientId: string | null; postTitle: string }
 type View = 'list' | 'kanban' | 'calendar'
 const VIEWS: View[] = ['list', 'kanban', 'calendar']
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-2.5 py-1.5 text-sm bg-white'
 const PRIORITY_RANK: Record<string, number> = { Urgent: 0, High: 1, Medium: 2, Low: 3 }
 const INVOICE_LABEL: Record<string, string> = { not_invoiced: 'not invoiced', invoiced: 'invoiced', paid: 'paid' }
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -212,10 +212,10 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
         )}
         {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
         <div className="flex items-center gap-2 mt-4">
-          <button onClick={submit} disabled={pending} className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 cursor-pointer">
+          <button onClick={submit} disabled={pending} className={btnPrimary}>
             {pending ? 'Saving…' : task ? 'Save' : 'Create task'}
           </button>
-          <button onClick={onClose} className="text-sm text-[#5A5E66] rounded-lg px-3 py-2 hover:bg-[#F4F4F6] cursor-pointer">Cancel</button>
+          <button onClick={onClose} className={btnGhost}>Cancel</button>
         </div>
       </div>
     </div>
@@ -331,7 +331,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
             ))}
           </div>
         </div>
-        <button onClick={() => setModal({ open: true, task: null, servesLabel: null })} className="bg-[#15171C] text-white rounded-lg px-3.5 py-2 text-sm font-semibold cursor-pointer">New task</button>
+        <button onClick={() => setModal({ open: true, task: null, servesLabel: null })} className={btnPrimary}>New task</button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-4">

@@ -10,6 +10,7 @@ import VersionHistory from './VersionHistory'
 import ClientVersionHistory from './ClientVersionHistory'
 import InternalNotes from './InternalNotes'
 import ProductionDetails from './ProductionDetails'
+import { labelCls, fieldCls, btnPrimary, btnGhost, btnDangerOutline } from '@/components/ui'
 
 type ActionState = { error: string | null; ok: boolean }
 type ActionFn = (prev: ActionState, fd: FormData) => Promise<ActionState>
@@ -109,7 +110,7 @@ function AddCommentForm({ itemId, action }: { itemId: string; action: ActionFn }
         <button
           type="submit"
           disabled={pending || !body.trim()}
-          className="bg-[#15171C] text-white rounded-lg px-3.5 py-2 text-sm font-semibold disabled:opacity-50"
+          className={btnPrimary}
         >
           {pending ? 'Posting…' : 'Comment'}
         </button>
@@ -134,9 +135,6 @@ function CommentDeleteButton({ commentId, action }: { commentId: string; action:
     </form>
   )
 }
-
-const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white'
 
 function EditPostForm({
   item,
@@ -190,11 +188,11 @@ function EditPostForm({
         <button
           type="submit"
           disabled={pending}
-          className="bg-[#15171C] text-white rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+          className={btnPrimary}
         >
           {pending ? 'Saving…' : 'Save changes'}
         </button>
-        <button type="button" onClick={onCancel} className="text-sm text-[#5A5E66] rounded-lg px-3 py-2.5 hover:bg-[#F4F4F6]">
+        <button type="button" onClick={onCancel} className={btnGhost}>
           Cancel
         </button>
       </div>
@@ -377,11 +375,7 @@ export default function Drawer({
                       name="action"
                       value={a}
                       disabled={pending}
-                      className={`rounded-lg px-3.5 py-2 text-sm font-semibold disabled:opacity-50 ${
-                        danger
-                          ? 'border border-[#E0572E] text-[#E0572E] hover:bg-[#E0572E]/5'
-                          : 'bg-[#15171C] text-white'
-                      }`}
+                      className={danger ? btnDangerOutline : btnPrimary}
                     >
                       {label}
                     </button>

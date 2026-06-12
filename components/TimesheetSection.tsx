@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   startTimerAction, stopTimerAction, logTimeAction, updateTimeEntryAction, deleteTimeEntryAction,
 } from '@/app/(app)/clients/[id]/timesheetActions'
+import { labelCls, fieldClsSm as fieldCls, btnPrimary, btnPrimarySm } from '@/components/ui'
 
 type Entry = {
   id: string
@@ -17,9 +18,6 @@ type Entry = {
 }
 type Running = { id: string; client_id: string; started_at: string }
 type TaskOpt = { id: string; title: string }
-
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-2.5 py-1.5 text-sm bg-white'
-const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 function isoToLocalInput(iso: string) {
@@ -169,13 +167,13 @@ function Timer({ clientId, running, runningHere, elapsedMs, tasks, busy, onStart
           <div className="text-sm">Timer running · <span className="font-mono font-semibold">{pad(hh)}:{pad(mm)}:{pad(ss)}</span></div>
           {!stopping && (
             <button onClick={() => { setEndVal(nowLocalInput()); setStopping(true) }} disabled={busy}
-              className="bg-[#15171C] text-white rounded-lg px-3.5 py-1.5 text-sm font-semibold disabled:opacity-50">Stop</button>
+              className={btnPrimarySm}>Stop</button>
           )}
         </div>
         {stopping && (
           <div className="flex items-end gap-2 mt-3">
             <div><label className={labelCls}>End time</label><input type="datetime-local" value={endVal} onChange={(e) => setEndVal(e.target.value)} className={fieldCls} /></div>
-            <button onClick={() => onStop(localToISO(endVal))} disabled={busy} className="bg-[#15171C] text-white rounded-lg px-3.5 py-1.5 text-sm font-semibold disabled:opacity-50">Save</button>
+            <button onClick={() => onStop(localToISO(endVal))} disabled={busy} className={btnPrimarySm}>Save</button>
             <button onClick={() => setStopping(false)} className="text-sm text-[#5A5E66] px-3 py-1.5 hover:bg-[#F4F4F6] rounded-lg">Cancel</button>
           </div>
         )}
@@ -253,7 +251,7 @@ function ManualForm({ tasks, busy, onLog }: {
         </div>
       </div>
       {localErr && <p className="text-sm text-red-600 mt-2">{localErr}</p>}
-      <button onClick={submit} disabled={busy} className="mt-3 bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">Log time</button>
+      <button onClick={submit} disabled={busy} className={`${btnPrimary} mt-3`}>Log time</button>
     </div>
   )
 }

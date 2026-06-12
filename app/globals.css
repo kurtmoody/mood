@@ -57,6 +57,15 @@ body {
     border-radius: 2px;
   }
 
+  /* Form fields get the subtler darkened-border + soft ring treatment instead. */
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: none;
+    border-color: var(--color-ink);
+    box-shadow: 0 0 0 3px rgb(21 23 28 / 0.08);
+  }
+
   /* Smooth state changes on every interactive element without per-component classes. */
   button,
   [role="button"],

@@ -6,6 +6,7 @@ import { GripVertical } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { mediaKind, mediaName } from '@/lib/media'
 import type { Media } from './Calendar'
+import { btnPrimary } from '@/components/ui'
 
 const BUCKET = 'content-media'
 const ACCEPT = 'image/*,video/mp4,application/pdf'
@@ -217,7 +218,7 @@ export default function MediaSection({
           <button
             onClick={upload}
             disabled={busy || staged.length === 0 || !versionId}
-            className="mt-3 bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+            className={`${btnPrimary} mt-3`}
           >
             {busy ? 'Uploading…' : `Upload${staged.length ? ` (${staged.length})` : ''}`}
           </button>

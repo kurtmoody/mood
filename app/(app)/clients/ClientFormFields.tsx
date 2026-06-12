@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react'
 import ColourPicker from '@/components/ColourPicker'
-
-const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white'
+import { labelCls, fieldCls } from '@/components/ui'
 
 export type ClientDefaults = {
   name?: string | null

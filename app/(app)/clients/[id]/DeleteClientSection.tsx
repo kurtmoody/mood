@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react'
 import { deleteClientAction, type FormState } from './actions'
 import { exportClientBundle } from '@/lib/exportClient'
+import { btnDanger, btnGhost } from '@/components/ui'
 
 const initial: FormState = { error: null, ok: false }
 
@@ -91,10 +92,10 @@ function DeleteModal({
           <input type="hidden" name="client_id" value={clientId} />
           {state.error && <p className="text-sm text-red-600">{state.error}</p>}
           <div className="flex items-center justify-end gap-2">
-            <button type="button" onClick={onClose} className="text-sm text-[#5A5E66] rounded-lg px-4 py-2 font-medium hover:bg-[#FBFBFC]">
+            <button type="button" onClick={onClose} className={btnGhost}>
               Cancel
             </button>
-            <button type="submit" disabled={pending} className="bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
+            <button type="submit" disabled={pending} className={btnDanger}>
               {pending ? 'Deleting…' : 'Delete permanently'}
             </button>
           </div>

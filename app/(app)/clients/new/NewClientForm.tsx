@@ -4,6 +4,7 @@ import { useActionState } from 'react'
 import Link from 'next/link'
 import { createClientAction, type FormState } from './actions'
 import ClientFormFields from '../ClientFormFields'
+import { btnPrimary } from '@/components/ui'
 
 const initial: FormState = { error: null }
 
@@ -20,7 +21,7 @@ export default function NewClientForm() {
         <button
           type="submit"
           disabled={pending}
-          className="bg-[#15171C] text-white rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+          className={btnPrimary}
         >
           {pending ? 'Saving…' : 'Create client'}
         </button>

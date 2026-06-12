@@ -7,6 +7,7 @@ import {
   deleteTeamMemberAction,
   type FormState,
 } from './actions'
+import { labelCls, fieldCls, btnPrimary, btnDanger, btnGhost } from '@/components/ui'
 
 export type Member = {
   id: string
@@ -18,8 +19,6 @@ export type Member = {
 }
 
 const initial: FormState = { error: null, ok: false }
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white'
-const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
 const gridCls = 'grid grid-cols-[1.4fr_1fr_1.4fr_auto_auto] gap-4 px-5 items-center'
 
 export default function TeamList({ members, isAdmin }: { members: Member[]; isAdmin: boolean }) {
@@ -179,10 +178,10 @@ function DeleteModal({
             </div>
             {state.error && <p className="text-sm text-red-600">{state.error}</p>}
             <div className="flex items-center justify-end gap-2 pt-1">
-              <button type="button" onClick={onClose} className="text-sm text-[#5A5E66] rounded-lg px-4 py-2 font-medium hover:bg-[#FBFBFC]">
+              <button type="button" onClick={onClose} className={btnGhost}>
                 Cancel
               </button>
-              <button type="submit" disabled={pending} className="bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
+              <button type="submit" disabled={pending} className={btnDanger}>
                 {pending ? 'Deleting…' : 'Delete permanently'}
               </button>
             </div>
@@ -224,10 +223,10 @@ function EditModal({ member, onClose }: { member: Member; onClose: () => void })
           </label>
           {state.error && <p className="text-sm text-red-600">{state.error}</p>}
           <div className="flex items-center justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="text-sm text-[#5A5E66] rounded-lg px-4 py-2 font-medium hover:bg-[#FBFBFC]">
+            <button type="button" onClick={onClose} className={btnGhost}>
               Cancel
             </button>
-            <button type="submit" disabled={pending} className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
+            <button type="submit" disabled={pending} className={btnPrimary}>
               {pending ? 'Saving…' : 'Save'}
             </button>
           </div>

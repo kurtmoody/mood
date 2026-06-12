@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { TASK_TYPES } from '@/lib/taskConstants'
 import { setRaciMatrixAction, type RaciCell } from './raciActions'
+import { btnPrimary } from '@/components/ui'
 
 type Member = { id: string; full_name: string }
 const RACI_VALUES = ['', 'A', 'R', 'S', 'C', 'I', 'A/R'] // '' = — (no assignment)
@@ -87,7 +88,7 @@ export default function RaciEditor({ agencyId, members, cells, loadError }: {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex items-center gap-3">
-        <button onClick={save} disabled={pending} className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 cursor-pointer">
+        <button onClick={save} disabled={pending} className={btnPrimary}>
           {pending ? 'Saving…' : 'Save matrix'}
         </button>
         {saved && <span className="text-sm text-[#16A34A]">Saved.</span>}

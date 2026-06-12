@@ -2,13 +2,12 @@
 
 import { useActionState, useEffect, useState } from 'react'
 import { createPostAction, type PostState } from './postActions'
+import { labelCls, fieldCls, btnPrimary, btnGhost } from '@/components/ui'
 
 type ClientOption = { id: string; name: string }
 type Channel = { id: string; type: string; label: string | null }
 
 const initial: PostState = { error: null, ok: false }
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white'
-const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
 
 const CONTENT_TYPES = ['post', 'story', 'reel', 'carousel', 'blog', 'newsletter', 'other']
 
@@ -114,11 +113,11 @@ export default function NewPostForm({
             <button
               type="submit"
               disabled={pending || !clientId || !when}
-              className="bg-[#15171C] text-white rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+              className={btnPrimary}
             >
               {pending ? 'Creating…' : 'Create post'}
             </button>
-            <button type="button" onClick={onClose} className="text-sm text-[#5A5E66] rounded-lg px-3 py-2.5 hover:bg-[#F4F4F6]">
+            <button type="button" onClick={onClose} className={btnGhost}>
               Cancel
             </button>
           </div>

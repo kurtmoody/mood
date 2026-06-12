@@ -2,10 +2,9 @@
 
 import { useActionState, useEffect, useRef } from 'react'
 import { addTeamMemberAction, type FormState } from './actions'
+import { labelCls, fieldCls, btnPrimary } from '@/components/ui'
 
 const initial: FormState = { error: null, ok: false }
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white'
-const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
 
 export default function AddTeamMemberForm() {
   const [state, action, pending] = useActionState(addTeamMemberAction, initial)
@@ -35,7 +34,7 @@ export default function AddTeamMemberForm() {
         <button
           type="submit"
           disabled={pending}
-          className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          className={btnPrimary}
         >
           {pending ? 'Adding…' : 'Add'}
         </button>

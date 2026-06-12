@@ -12,6 +12,7 @@ import { transitionPostAction } from './approvalActions'
 import { addCommentAction, deleteCommentAction } from './commentActions'
 import { updatePostAction, reschedulePostAction } from './postActions'
 import { addDays, addMonths, maltaDate, mondayOf, monthOf, monthGridDates, monthLabel, rescheduleToDateMalta, weekDates, weekRangeLabel } from '@/lib/week'
+import { btnPrimary, btnGhost } from '@/components/ui'
 
 type ClientOption = { id: string; name: string; colour: string; archived: boolean }
 type Channel = { id: string; type: string; label: string | null }
@@ -237,7 +238,7 @@ export default function CalendarBoard({
           {isAgency && (
             <button
               onClick={() => setFormDate('')}
-              className="shrink-0 bg-[#15171C] text-white rounded-lg px-3.5 py-2 text-sm font-semibold"
+              className={`${btnPrimary} shrink-0`}
             >
               New post
             </button>
@@ -413,8 +414,8 @@ function RescheduleConfirm({
           </label>
         )}
         <div className="flex items-center justify-end gap-2">
-          <button onClick={onCancel} className="text-sm text-[#5A5E66] rounded-lg px-3 py-2 hover:bg-[#F4F4F6] cursor-pointer">Cancel</button>
-          <button onClick={() => onConfirm(markPosted)} className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer">Move</button>
+          <button onClick={onCancel} className={btnGhost}>Cancel</button>
+          <button onClick={() => onConfirm(markPosted)} className={btnPrimary}>Move</button>
         </div>
       </div>
     </div>

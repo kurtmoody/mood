@@ -3,12 +3,11 @@
 import { useActionState } from 'react'
 import { setClientOwnershipAction, type OwnershipState } from './clientOwnershipActions'
 import { OWNERSHIP_ROLES, type Ownership } from '@/lib/ownershipRoles'
+import { labelCls, fieldCls, btnPrimary } from '@/components/ui'
 
 export type TeamOption = { id: string; full_name: string }
 
 const initial: OwnershipState = { error: null, ok: false }
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white'
-const labelCls = 'block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1'
 
 export default function OwnershipSection({ clientId, ownership, teamMembers }: {
   clientId: string
@@ -42,7 +41,7 @@ export default function OwnershipSection({ clientId, ownership, teamMembers }: {
           <button
             type="submit"
             disabled={pending}
-            className="bg-[#15171C] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+            className={btnPrimary}
           >
             {pending ? 'Saving…' : 'Save ownership'}
           </button>

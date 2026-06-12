@@ -11,9 +11,9 @@ import {
   type LinkResult,
 } from '@/app/(app)/assetLinkActions'
 import type { AssetLink } from './Calendar'
+import { fieldClsSm as fieldCls, btnPrimarySm } from '@/components/ui'
 
 const PRESETS = ['Drive folder', 'Raw footage', 'Final exports', 'Other']
-const fieldCls = 'w-full border border-[#E2E2E5] rounded-lg px-2.5 py-1.5 text-sm bg-white'
 
 function isUrl(s: string) {
   return /^https?:\/\//i.test(s.trim())
@@ -56,7 +56,7 @@ function LinkForm({ initialLabel = '', initialUrl = '', submitLabel, onSubmit, o
         <button
           onClick={submit}
           disabled={pending || !label || !url.trim()}
-          className="bg-[#15171C] text-white rounded-lg px-3 py-1.5 text-sm font-semibold disabled:opacity-50 cursor-pointer"
+          className={btnPrimarySm}
         >
           {pending ? 'Saving…' : submitLabel}
         </button>
