@@ -1,4 +1,8 @@
+'use client'
+
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import FilterMenu from '@/components/FilterMenu'
 import type { ProfitModel, Totals } from '@/lib/profitability'
 import type { Range, Preset } from '@/lib/reportRange'
 
@@ -24,16 +28,60 @@ function marginClass(m: number | null): string {
   return m < 0 ? 'text-[#E0572E] font-semibold' : 'text-[#15171C]'
 }
 
-export default function ProfitabilityReport({ model, range }: { model: ProfitModel; range: Range }) {
-  const href = (p: Preset) => `/reports?range=${p}`
+export default function ProfitabilityReport({
+  model,
+  range,
+  clients,
+  selectedClientIds,
+}: {
+  model: ProfitModel
+  range: Range
+  clients: { id: string; name: string }[]
+  selectedClientIds: string[]
+}) {
+  const router = useRouter()
+  const params = useSearchParams()
+
+  // Switching preset keeps the client scope; drop any stale custom from/to.
+  const href = (p: Preset) => {
+    const sp = new URLSearchParams(params.toString())
+    sp.set('range', p)
+    sp.delete('from')
+    sp.delete('to')
+    return `/reports?${sp.toString()}`
+  }
+
+  // Client scope lives in ?clients= (mirrors the calendar): clear the param when the
+  // selection is empty or all, else set it comma-joined. Other params preserved.
+  function setClients(ids: string[]) {
+    const sp = new URLSearchParams(params.toString())
+    if (ids.length === 0 || ids.length === clients.length) sp.delete('clients')
+    else sp.set('clients', ids.join(','))
+    router.push(`/reports?${sp.toString()}`)
+  }
+  function toggleClient(id: string) {
+    const set = new Set(selectedClientIds)
+    if (set.has(id)) set.delete(id)
+    else set.add(id)
+    setClients([...set])
+  }
 
   return (
     <div>
       <h1 className="text-2xl font-bold">Profitability</h1>
       <p className="text-sm text-[#9398A1] mt-1 mb-5">Per-job value, time-cost and margin. Admin-only.</p>
 
-      {/* Range control */}
+      {/* Client + range controls */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
+        {clients.length > 1 && (
+          <FilterMenu
+            label="Clients"
+            options={clients.map((c) => ({ value: c.id, label: c.name }))}
+            selected={new Set(selectedClientIds)}
+            onToggle={toggleClient}
+            onClear={() => setClients([])}
+          />
+        )}
         <div className="inline-flex rounded-lg border border-[#E2E2E5] overflow-hidden text-sm">
           {PRESET_LABELS.map(({ p, label }) => (
             <Link key={p} href={href(p)}
@@ -44,12 +92,15 @@ export default function ProfitabilityReport({ model, range }: { model: ProfitMod
         </div>
         <form method="get" className="flex items-center gap-1.5">
           <input type="hidden" name="range" value="custom" />
+          {selectedClientIds.length > 0 && <input type="hidden" name="clients" value={selectedClientIds.join(',')} />}
           <input type="date" name="from" className="border border-[#E2E2E5] rounded-lg px-2 py-1.5 text-sm" />
           <span className="text-[#9398A1] text-sm">–</span>
           <input type="date" name="to" className="border border-[#E2E2E5] rounded-lg px-2 py-1.5 text-sm" />
           <button type="submit" className={`px-3 py-1.5 text-sm rounded-lg border ${range.preset === 'custom' ? 'bg-[#15171C] text-white border-[#15171C] font-semibold' : 'border-[#E2E2E5] text-[#5A5E66] hover:bg-[#F4F4F6]'}`}>Custom</button>
         </form>
-        <span className="text-sm text-[#5A5E66] ml-auto">{range.label}</span>
+        <span className="text-sm text-[#5A5E66] ml-auto">
+          {selectedClientIds.length > 0 ? `${selectedClientIds.length} of ${clients.length} clients` : 'All clients'} · {range.label}
+        </span>
       </div>
 
       {!model.rateSet && (
