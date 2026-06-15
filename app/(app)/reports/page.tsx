@@ -2,17 +2,19 @@ import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getAccess } from '@/lib/access'
-import { zonedDayStartUTC } from '@/lib/week'
+import { zonedDayStartUTC, todayMalta } from '@/lib/week'
 import { resolveRange, PRESETS, type Preset } from '@/lib/reportRange'
 import { computeProfitability, type RepTask, type RepEntry, type RepClient } from '@/lib/profitability'
 import { computeTimeReport, type TimeEntryRow } from '@/lib/timeReport'
+import { computeCapacity, rangeWeeks } from '@/lib/capacity'
 import ProfitabilityReport from '@/components/ProfitabilityReport'
 import TimeReport from '@/components/TimeReport'
+import CapacityPlanner from '@/components/CapacityPlanner'
 import PageContainer from '@/components/PageContainer'
 
 // /reports is open to ALL agency members. The Time report (below) is member-visible and
 // NON-FINANCIAL; the financial Profitability report stays ADMIN-ONLY.
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ range?: string; from?: string; to?: string; clients?: string; people?: string }> }) {
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ range?: string; from?: string; to?: string; clients?: string; people?: string; cap?: string }> }) {
   const supabase = await createClient()
   const access = await getAccess(supabase)
   if (!access) redirect('/login')
@@ -28,6 +30,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const selectedClientIds = (sp.clients ?? '').split(',').map((s) => s.trim()).filter(Boolean)
   const selectedPeopleIds = (sp.people ?? '').split(',').map((s) => s.trim()).filter(Boolean)
   const hasClientFilter = selectedClientIds.length > 0
+
+  // Capacity is forward-looking with its OWN ?cap preset (weeks from this week forward),
+  // independent of the historical ?range/?from/?to. >8 weeks → month columns.
+  const CAP_PRESETS = [5, 8, 13, 26, 52]
+  const capWeeks = CAP_PRESETS.includes(Number(sp.cap)) ? Number(sp.cap) : 5
+  const capMode: 'week' | 'month' = capWeeks <= 8 ? 'week' : 'month'
 
   // ───────────────── Member-level TIME report (NON-FINANCIAL) ─────────────────
   // SECURITY BOUNDARY: this query selects ONLY user_id, client_id, task_id, duration_minutes,
@@ -65,6 +73,32 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       .map((m) => [m.user_id as string, { id: m.user_id as string, name: (m.full_name as string) ?? 'Unknown' }]),
   ).values()]
   const timeError = teErr ? `Could not load time data — ${teErr.message}` : null
+
+  // ───────────────── Member-level CAPACITY (NON-FINANCIAL) ─────────────────
+  // SECURITY BOUNDARY: both queries select ONLY non-financial columns — capacity needs
+  // id/status/dates/estimate/owner_id from task, and id/full_name from the roster. NO value/cost.
+  // RLS scopes tasks to the agency; all members may read them. Deliberately uses ALL tasks
+  // (archived clients included) — committed load is load — and the helper excludes only
+  // Complete/On-Hold from hours. Names come from the roster, so no owner embed is needed.
+  const { data: capTasks, error: capErr } = await supabase
+    .from('task')
+    .select('id, status, due_date, start_date, estimated_hours, owner_id')
+  if (capErr) console.error('reports: task (capacity)', capErr)
+  // Active roster — id = team_member.id, matching task.owner_id. Every active member gets a row
+  // (idle people show as spare capacity). is_active is the active flag (0005).
+  const { data: rosterRows, error: rosterErr } = await supabase.from('team_member').select('id, full_name').eq('is_active', true)
+  if (rosterErr) console.error('reports: team_member (roster)', rosterErr)
+  const roster = (rosterRows ?? []).map((m) => ({ id: m.id as string, name: (m.full_name as string) ?? 'Unknown' }))
+  const capModel = computeCapacity(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (capTasks ?? []).map((t: any) => ({
+      owner_id: t.owner_id, status: t.status,
+      estimated_hours: t.estimated_hours, start_date: t.start_date, due_date: t.due_date,
+    })),
+    rangeWeeks(todayMalta(), capWeeks),
+    capMode,
+    roster,
+  )
 
   // ───────────────── SECURITY BOUNDARY: Admin-only PROFITABILITY (FINANCIAL) ─────────────────
   // Everything financial lives ONLY inside this admin branch: the cost_per_hour fetch, the valued
@@ -132,6 +166,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         selectedPeopleIds={selectedPeopleIds}
         error={timeError}
       />
+      <div className="mt-12">
+        <CapacityPlanner model={capModel} n={capWeeks} mode={capMode} basePath="/reports" params={{ ...sp }} />
+      </div>
       {profitability && <div className="mt-12 border-t border-[#ECECEE] pt-10">{profitability}</div>}
     </PageContainer>
   )

@@ -6,7 +6,6 @@ import { mondayOf, addDays, monthOf, monthLabel } from './week'
 
 export type CapTask = {
   owner_id: string | null
-  owner_name: string | null
   status: string
   estimated_hours: number | null
   start_date: string | null
@@ -15,16 +14,28 @@ export type CapTask = {
 
 export type CapColumn = { key: string; label: string; capacity: number }
 
+export type CapRoster = { id: string; name: string } // active team member (id = team_member.id)
+
 export type CapRow = {
   ownerId: string
   name: string
   cells: Record<string, number> // colKey → allocated hours
-  unscheduledHours: number      // estimated but no dates
+  plannedHours: number          // Σ of this row's in-period cells (scheduled hours)
+  availableHours: number        // Σ of all column capacities (same for everyone)
+  pct: number                   // plannedHours / availableHours, as a 0–100 percentage
+  unscheduledHours: number      // estimated but no dates (NOT in pct — not planned into the period)
   unestimatedCount: number      // open (non-hold) with no estimate
   onHoldCount: number           // on-hold tasks (excluded from hours)
 }
 
-export type CapModel = { columns: CapColumn[]; rows: CapRow[] }
+export type CapSummary = {
+  totalPlannedHours: number
+  totalAvailableHours: number   // availableHours × headcount
+  pct: number                   // 0–100 team utilisation
+  headcount: number
+}
+
+export type CapModel = { columns: CapColumn[]; rows: CapRow[]; summary: CapSummary }
 
 const WEEK_BASELINE = 40
 
@@ -43,34 +54,37 @@ function weekLabel(monday: string): string {
 }
 
 // weekMondays: the visible range (ordered Monday keys). mode: 'week' or 'month'.
-export function computeCapacity(tasks: CapTask[], weekMondays: string[], mode: 'week' | 'month'): CapModel {
-  const rows = new Map<string, CapRow>()
-  const getRow = (id: string, name: string | null): CapRow => {
-    let r = rows.get(id)
-    if (!r) { r = { ownerId: id, name: name ?? 'Unknown', cells: {}, unscheduledHours: 0, unestimatedCount: 0, onHoldCount: 0 }; rows.set(id, r) }
-    return r
+// roster: the active team — EVERY member gets a row (idle members at 0% = spare capacity).
+export function computeCapacity(tasks: CapTask[], weekMondays: string[], mode: 'week' | 'month', roster: CapRoster[]): CapModel {
+  // 1) Allocate each task's hours to weeks (unbounded), and tally honesty buckets, keyed by
+  //    owner_id (= team_member.id). Names come from the roster, not the task embed.
+  type Alloc = { weekly: Record<string, number>; unscheduledHours: number; unestimatedCount: number; onHoldCount: number }
+  const alloc = new Map<string, Alloc>()
+  const getAlloc = (id: string): Alloc => {
+    let a = alloc.get(id)
+    if (!a) { a = { weekly: {}, unscheduledHours: 0, unestimatedCount: 0, onHoldCount: 0 }; alloc.set(id, a) }
+    return a
   }
 
-  // 1) Allocate each task's hours to weeks (unbounded), and tally honesty buckets.
   for (const t of tasks) {
     if (!t.owner_id) continue
     if (t.status === 'Complete') continue
-    const r = getRow(t.owner_id, t.owner_name)
-    if (t.status === 'On Hold') { r.onHoldCount++; continue }
-    if (t.estimated_hours == null) { r.unestimatedCount++; continue }
+    const a = getAlloc(t.owner_id)
+    if (t.status === 'On Hold') { a.onHoldCount++; continue }
+    if (t.estimated_hours == null) { a.unestimatedCount++; continue }
     const est = Number(t.estimated_hours)
 
     let span: string[]
     if (t.start_date && t.due_date) span = weeksInclusive(t.start_date, t.due_date)
     else if (t.due_date) span = [mondayOf(t.due_date)]
     else if (t.start_date) span = [mondayOf(t.start_date)]
-    else { r.unscheduledHours += est; continue } // estimated but undated
+    else { a.unscheduledHours += est; continue } // estimated but undated
 
     const slice = span.length > 0 ? est / span.length : 0
-    for (const w of span) r.cells[w] = (r.cells[w] ?? 0) + slice
+    for (const w of span) a.weekly[w] = (a.weekly[w] ?? 0) + slice
   }
 
-  // 2) Project the per-week allocation onto the visible columns.
+  // 2) Columns + availableHours (Σ of all column capacities — same for everyone).
   let columns: CapColumn[]
   if (mode === 'week') {
     columns = weekMondays.map((m) => ({ key: m, label: weekLabel(m), capacity: WEEK_BASELINE }))
@@ -84,24 +98,48 @@ export function computeCapacity(tasks: CapTask[], weekMondays: string[], mode: '
     }
     columns = order.map((mo) => ({ key: mo, label: monthLabel(mo), capacity: WEEK_BASELINE * (weeksPerMonth.get(mo) ?? 0) }))
   }
+  const availableHours = columns.reduce((s, c) => s + c.capacity, 0)
 
-  const out: CapRow[] = []
-  for (const r of rows.values()) {
-    // Only owners with something to show (load in range, or an honesty bucket).
+  // 3) One row per ACTIVE roster member — idle members included at 0% (spare capacity).
+  const rows: CapRow[] = roster.map(({ id, name }) => {
+    const a = alloc.get(id)
     const cells: Record<string, number> = {}
-    if (mode === 'week') {
-      for (const m of weekMondays) if (r.cells[m]) cells[m] = r.cells[m]
-    } else {
-      for (const col of columns) {
-        let sum = 0
-        for (const m of weekMondays) if (monthOf(m) === col.key) sum += r.cells[m] ?? 0
-        if (sum) cells[col.key] = sum
+    if (a) {
+      if (mode === 'week') {
+        for (const m of weekMondays) if (a.weekly[m]) cells[m] = a.weekly[m]
+      } else {
+        for (const col of columns) {
+          let sum = 0
+          for (const m of weekMondays) if (monthOf(m) === col.key) sum += a.weekly[m] ?? 0
+          if (sum) cells[col.key] = sum
+        }
       }
     }
-    out.push({ ...r, cells })
+    const plannedHours = Object.values(cells).reduce((s, h) => s + h, 0)
+    return {
+      ownerId: id,
+      name,
+      cells,
+      plannedHours,
+      availableHours,
+      pct: availableHours > 0 ? (plannedHours / availableHours) * 100 : 0,
+      unscheduledHours: a?.unscheduledHours ?? 0,
+      unestimatedCount: a?.unestimatedCount ?? 0,
+      onHoldCount: a?.onHoldCount ?? 0,
+    }
+  })
+  rows.sort((a, b) => a.name.localeCompare(b.name))
+
+  const totalPlannedHours = rows.reduce((s, r) => s + r.plannedHours, 0)
+  const totalAvailableHours = availableHours * roster.length
+  const summary: CapSummary = {
+    totalPlannedHours,
+    totalAvailableHours,
+    pct: totalAvailableHours > 0 ? (totalPlannedHours / totalAvailableHours) * 100 : 0,
+    headcount: roster.length,
   }
-  out.sort((a, b) => a.name.localeCompare(b.name))
-  return { columns, rows: out }
+
+  return { columns, rows, summary }
 }
 
 // The visible range: n Monday keys from the current Malta week forward.

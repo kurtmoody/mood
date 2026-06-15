@@ -2,10 +2,8 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getAccess } from '@/lib/access'
-import { mondayOf, maltaDate, todayMalta } from '@/lib/week'
+import { mondayOf, maltaDate } from '@/lib/week'
 import { STATUS_COLOUR, OPEN_STATUSES } from '@/lib/taskConstants'
-import { computeCapacity, rangeWeeks } from '@/lib/capacity'
-import CapacityPlanner from '@/components/CapacityPlanner'
 import PageContainer from '@/components/PageContainer'
 
 // Statuses that need attention. Deliberately excludes draft (still being worked) and
@@ -39,7 +37,7 @@ type Row = {
   archived: boolean
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ archived?: string; cap?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ archived?: string }> }) {
   const supabase = await createClient()
   const access = await getAccess(supabase)
   if (!access) redirect('/login')
@@ -49,10 +47,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // task views; ?archived=1 includes them (marked). All counts derive from the filtered set.
   const sp = await searchParams
   const showArchived = sp.archived === '1'
-  // Capacity range: number of weeks from this week forward (preset). >8 weeks → month columns.
-  const CAP_PRESETS = [5, 8, 13, 26, 52]
-  const capWeeks = CAP_PRESETS.includes(Number(sp.cap)) ? Number(sp.cap) : 5
-  const capMode: 'week' | 'month' = capWeeks <= 8 ? 'week' : 'month'
 
   // No client filter: RLS scopes content_item to is_agency_for_client(...), so this
   // returns exactly the agency's clients' posts across ALL of them.
@@ -105,18 +99,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     (t: any) => t.status !== 'Complete' && (showArchived || t.client?.status !== 'archived'),
   )
   const overdueCount = openTasks.filter((t: any) => t.due_date && t.due_date < todayISO).length
-
-  // Capacity: spread each task's estimate across its weeks, per owner. Deliberately uses
-  // ALL tasks (archived clients included) — committed load is load — and excludes only
-  // Complete/On-Hold from hours (the helper handles status). Not affected by showArchived.
-  const capModel = computeCapacity(
-    (taskData ?? []).map((t: any) => ({
-      owner_id: t.owner_id, owner_name: t.owner?.full_name ?? null, status: t.status,
-      estimated_hours: t.estimated_hours, start_date: t.start_date, due_date: t.due_date,
-    })),
-    rangeWeeks(todayMalta(), capWeeks),
-    capMode,
-  )
 
   const taskStatusCounts = OPEN_STATUSES
     .map((s) => ({ status: s as string, count: openTasks.filter((t: any) => t.status === s).length }))
@@ -209,8 +191,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </div>
         )}
       </section>
-
-      <CapacityPlanner model={capModel} n={capWeeks} archived={showArchived} mode={capMode} />
     </PageContainer>
   )
 }
