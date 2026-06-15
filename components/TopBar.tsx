@@ -3,8 +3,9 @@
 import { Menu } from 'lucide-react'
 import NotificationBell from './NotificationBell'
 import UserMenu from './UserMenu'
+import LogTimeLauncher from './LogTimeLauncher'
 
-export default function TopBar({ onBurger, email }: { onBurger: () => void; email: string }) {
+export default function TopBar({ onBurger, email, isAgency }: { onBurger: () => void; email: string; isAgency: boolean }) {
   return (
     <header className="h-14 sticky top-0 z-20 bg-[#FBFBFC]/80 backdrop-blur border-b border-[#ECECEE] flex items-center justify-between px-4 sm:px-6 lg:px-8">
       <button
@@ -15,7 +16,8 @@ export default function TopBar({ onBurger, email }: { onBurger: () => void; emai
         <Menu size={20} />
       </button>
       <div className="flex-1" />
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
+        {isAgency && <LogTimeLauncher />}
         <NotificationBell />
         <UserMenu email={email} />
       </div>

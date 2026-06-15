@@ -70,6 +70,15 @@ export function zonedDayStartUTC(dateStr: string): Date {
   return zonedDateTimeToUTC(dateStr, '00:00:00')
 }
 
+// UTC ISO string for a datetime-local value ('YYYY-MM-DDTHH:mm'), read as Malta
+// wall-clock. THE conversion for datetime-local inputs — never naive new Date(value),
+// which would read the input in the browser's timezone instead of Malta's.
+export function maltaInputToISO(value: string): string {
+  const [datePart, timePart] = value.split('T')
+  const time = timePart?.length === 5 ? `${timePart}:00` : (timePart ?? '00:00:00')
+  return zonedDateTimeToUTC(datePart, time).toISOString()
+}
+
 const timeFmt = new Intl.DateTimeFormat('en-GB', {
   timeZone: TZ,
   hourCycle: 'h23',

@@ -28,7 +28,7 @@ export default function AppShell({ email, isAgency, isAgencyAdmin, children }: {
     <div className="min-h-screen bg-[#FBFBFC] text-[#15171C]">
       <Sidebar open={open} onClose={() => setOpen(false)} pinned={pinned} onTogglePin={togglePin} isAgency={isAgency} isAgencyAdmin={isAgencyAdmin} />
       <div className={`transition-[padding] duration-200 ${pinned ? 'lg:pl-60' : 'lg:pl-16'}`}>
-        <TopBar onBurger={() => setOpen(true)} email={email} />
+        <TopBar onBurger={() => setOpen(true)} email={email} isAgency={isAgency} />
         <div className="px-4 sm:px-6 lg:px-8 py-6">{children}</div>
       </div>
     </div>
