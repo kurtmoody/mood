@@ -14,7 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/tasks', label: 'Tasks', icon: ListChecks, isActive: (p) => p === '/tasks' || p.startsWith('/tasks/'), agencyOnly: true },
   { href: '/clients', label: 'Clients', icon: Users, isActive: (p) => p === '/clients' || p.startsWith('/clients/'), agencyOnly: true },
   { href: '/team', label: 'Team', icon: Users2, isActive: (p) => p === '/team' || p.startsWith('/team/'), agencyOnly: true },
-  { href: '/reports', label: 'Reports', icon: LineChart, isActive: (p) => p === '/reports', adminOnly: true },
+  { href: '/reports', label: 'Reports', icon: LineChart, isActive: (p) => p === '/reports', agencyOnly: true },
   { href: '/admin', label: 'Admin', icon: Settings, isActive: (p) => p === '/admin' || p.startsWith('/admin/'), adminOnly: true },
 ]
 
