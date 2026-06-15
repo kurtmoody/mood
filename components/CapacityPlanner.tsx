@@ -65,12 +65,14 @@ export default function CapacityPlanner({
 }) {
   const { columns, rows, summary } = model
   // Switching the capacity preset changes only ?cap — every other query param (the Time
-  // report's ?range/?from/?to/?clients/?people) is preserved via a merge.
+  // report's ?range/?from/?to/?clients/?people) is preserved via a merge. No #capacity hash:
+  // a hash makes next/link treat the click as an in-page anchor (cached RSC, no re-render), so
+  // the figures wouldn't update. Plain ?cap navigation re-renders; scroll={false} keeps position.
   const href = (cap: number) => {
     const usp = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) if (v != null && k !== 'cap') usp.set(k, v)
     usp.set('cap', String(cap))
-    return `${basePath}?${usp.toString()}#capacity`
+    return `${basePath}?${usp.toString()}`
   }
 
   // Summary lists everyone (most-loaded first); the grid only the loaded (no empty rows).
@@ -89,6 +91,7 @@ export default function CapacityPlanner({
             <Link
               key={p.n}
               href={href(p.n)}
+              scroll={false}
               className={`px-2.5 py-1 ${n === p.n ? 'bg-[#15171C] text-white font-semibold' : 'text-[#5A5E66] hover:bg-[#F4F4F6]'}`}
             >
               {p.label}
