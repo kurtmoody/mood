@@ -4,6 +4,7 @@ import EditClientForm from './EditClientForm'
 import ChannelsSection, { type Channel } from './ChannelsSection'
 import ContactsSection, { type Contact } from './ContactsSection'
 import BrandAssetsSection, { type BrandAsset } from './BrandAssetsSection'
+import DeliverablesSection, { type Deliverable } from './DeliverablesSection'
 import OwnershipSection from './OwnershipSection'
 import DeleteClientSection from './DeleteClientSection'
 import TimesheetEnableToggle from './TimesheetEnableToggle'
@@ -43,6 +44,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
     { data: channels },
     { data: contacts },
     { data: assets },
+    { data: deliverables },
     { data: ownership },
     { data: invites },
   ] = await Promise.all([
@@ -61,6 +63,12 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
       .order('is_primary', { ascending: false })
       .order('first_name'),
     supabase.from('brand_asset').select('id, kind, label, value, notes').eq('client_id', id).order('kind'),
+    supabase
+      .from('client_deliverable')
+      .select('id, label, quantity, cadence, notes')
+      .eq('client_id', id)
+      .order('sort_order')
+      .order('created_at'),
     supabase
       .from('client_ownership')
       .select('lead_pm_id, comms_backup_id, creative_lead_id, design_owner_id, content_owner_id, video_owner_id, sales_ops_id, intern_support_id')
@@ -116,6 +124,10 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
 
       <div className="max-w-[680px] mt-10">
         <BrandAssetsSection clientId={client.id} assets={(assets as BrandAsset[] | null) ?? []} />
+      </div>
+
+      <div className="max-w-[680px] mt-10">
+        <DeliverablesSection clientId={client.id} deliverables={(deliverables as Deliverable[] | null) ?? []} />
       </div>
 
       <div className="max-w-[680px] mt-10">

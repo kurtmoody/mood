@@ -24,7 +24,7 @@
 12. [Notifications (bell + email)](#12-notifications)
 13. [Feature inventory](#13-feature-inventory)
 14. [RPC reference](#14-rpc-reference)
-15. [Migration ledger (0001–0050)](#15-migration-ledger)
+15. [Migration ledger (0001–0051)](#15-migration-ledger)
 16. [Conventions & hard-won gotchas](#16-conventions--hard-won-gotchas)
 17. [Testing (pgTap)](#17-testing-pgtap)
 18. [Operational runbook](#18-operational-runbook)
@@ -624,6 +624,7 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 | 0048 | close_client_internal_sidedoor (+test) | Drops the legacy permissive `client_internal_write` policy (the last write side-door, predates the 0016 RPC-only convention) + adds a CHECK constraining `raci_matrix.raci_value` to the legal set. |
 | 0049 | extend_invite (+test) | `extend_invite` — admin-only reset of an invite's 7-day expiry. |
 | 0050 | update_client_preserve_status (+test) | `update_client` defaults `p_status`/`p_timezone`/`p_currency` to null and coalesces each to the existing value, so a field the caller omits is preserved — root-causes the status-revert. Repo record of a live hand-edit. |
+| 0051 | client_deliverables (+test) | `client_deliverable` table (agency-only CRM: `label`/`quantity`/`cadence`/`notes`/`sort_order`; RLS = agency-for-client, no client path) + `add`/`update`/`delete`/`reorder_client_deliverable` RPCs. Records agreed deliverables per client (retainers). No `client_visible` flag in v1. |
 
 > `schema.sql` is the fresh-setup reference **only** — it has a destructive reset block at the top; **never run it against the live DB.** New changes go in a migration.
 
@@ -745,4 +746,4 @@ Client Approve/Request-changes UI · snapshot-on-send versioning · agency + cli
 
 ---
 
-*This document reflects the codebase at migration 0050. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*
+*This document reflects the codebase at migration 0051. Keep it current: when you ship a feature or migration, update the relevant section, the migration ledger, and the open-items list.*
