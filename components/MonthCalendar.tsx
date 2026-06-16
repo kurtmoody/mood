@@ -91,7 +91,13 @@ export default function MonthCalendar({
 
                   {dayItems.slice(0, MAX_CHIPS).map((it) => {
                     const s = STATUS[it.status] ?? STATUS.draft
-                    const label = it.title || it.channel?.label || it.channel?.type || it.content_type
+                    // Tight cells: title wins; else the first channel + "+N" for the rest.
+                    const chs = it.channels ?? []
+                    const first = chs[0]
+                    const channelText = first
+                      ? `${first.label ?? (first.type.charAt(0).toUpperCase() + first.type.slice(1))}${chs.length > 1 ? ` +${chs.length - 1}` : ''}`
+                      : (it.channel?.label ?? it.channel?.type ?? null)
+                    const label = it.title || channelText || it.content_type
                     const colour = it.clientColour ?? '#FFFFFF'
                     const fg = textOn(colour)
                     const ring = fg === '#FFFFFF' ? 'rgba(255,255,255,.5)' : 'rgba(0,0,0,.12)'

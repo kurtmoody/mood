@@ -130,17 +130,21 @@ export default function CalendarBoard({
       : ['client_review', 'changes_requested', 'approved', 'scheduled', 'posted']
   ).map((s) => ({ value: s, label: STATUS[s]?.label ?? s }))
 
-  // Channel options come from the channels actually present in the loaded posts.
+  // Channel options = the union of every channel across the loaded posts (from p.channels),
+  // plus a "No channel" bucket for posts with an empty set.
   const channelOptions = useMemo(() => {
     const map = new Map<string, string>()
+    let hasNone = false
     for (const p of posts) {
-      const key = p.channel_id ?? '__none__'
-      if (!map.has(key)) {
-        const t = p.channel?.type
-        map.set(key, p.channel?.label ?? (t ? t.charAt(0).toUpperCase() + t.slice(1) : 'No channel'))
+      const chs = p.channels ?? []
+      if (chs.length === 0) { hasNone = true; continue }
+      for (const c of chs) {
+        if (!map.has(c.id)) map.set(c.id, c.label ?? (c.type ? c.type.charAt(0).toUpperCase() + c.type.slice(1) : 'Channel'))
       }
     }
-    return [...map].map(([value, label]) => ({ value, label }))
+    const opts = [...map].map(([value, label]) => ({ value, label }))
+    if (hasNone) opts.push({ value: '__none__', label: 'No channel' })
+    return opts
   }, [posts])
 
   // The visible set: "Needs my review" (role-aware) takes precedence over the status
@@ -154,7 +158,13 @@ export default function CalendarBoard({
       } else if (statusFilter.size > 0 && !statusFilter.has(p.status)) {
         return false
       }
-      if (channelFilter.size > 0 && !channelFilter.has(p.channel_id ?? '__none__')) return false
+      if (channelFilter.size > 0) {
+        const chs = p.channels ?? []
+        const matches = chs.length === 0
+          ? channelFilter.has('__none__')                       // empty set → only the "No channel" bucket
+          : chs.some((c) => channelFilter.has(c.id))            // match if ANY of the post's channels is selected
+        if (!matches) return false
+      }
       return true
     })
   }, [localPosts, needsReview, statusFilter, channelFilter, isAgency, showArchived])

@@ -55,6 +55,15 @@ const cellInput = 'w-full bg-transparent border border-transparent hover:border-
 // the two can lag each other and either one means the post is live.
 const isPosted = (p: Item) => p.status === 'posted' || !!p.date_posted
 
+// The post's channel set as a comma-separated string (label, falling back to type); single
+// channel / content_type when there's no set. Used for the Platform cell, CSV, and grouping —
+// grouping/sorting keys off this joined string so it stays stable.
+function channelList(p: Item): string {
+  const chs = p.channels ?? []
+  if (chs.length > 0) return chs.map((c) => c.label ?? c.type).join(', ')
+  return p.channel?.type ?? p.content_type
+}
+
 // Agency-only table over the SAME posts as the calendar (passed in, already filtered).
 // Metadata cells are inline-editable via set_post_meta (no version fork); title/status/
 // caption are read-only here (the row title opens the full drawer).
@@ -131,7 +140,7 @@ export default function ContentGrid({
       } else if (groupBy === 'status') {
         add(p.status, STATUS[p.status]?.label ?? p.status, undefined, p)
       } else if (groupBy === 'platform') {
-        const t = p.channel?.type ?? p.content_type
+        const t = channelList(p)
         add(t, t.charAt(0).toUpperCase() + t.slice(1), undefined, p)
       } else {
         add('__all__', '', undefined, p)
@@ -164,7 +173,7 @@ export default function ContentGrid({
           case 'post': return esc(p.title)
           case 'client': return esc(clientById.get(p.client_id)?.name)
           case 'scheduled': return esc(p.scheduled_at ? new Date(p.scheduled_at).toLocaleString('en-GB', { timeZone: 'Europe/Malta' }) : '')
-          case 'platform': return esc(p.channel?.type ?? p.content_type)
+          case 'platform': return esc(channelList(p))
           case 'caption': return esc(p.body)
           case 'designer': return esc(designerName(p.designer_id))
           case 'design_status': return esc(p.design_status)
@@ -364,7 +373,7 @@ function GridRow({ post, visibleCols, team, pmName, client, onSelect, onError }:
   }
 
   const s = STATUS[post.status] ?? STATUS.draft
-  const platform = post.channel?.type ?? post.content_type
+  const platform = channelList(post)
   const scheduled = post.scheduled_at
     ? new Date(post.scheduled_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     : '—'

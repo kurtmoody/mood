@@ -181,9 +181,17 @@ export default function Calendar({
                   className={`text-left rounded-xl shadow-sm hover:shadow-md transition p-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#15171C]/15 ${dragEnabled ? 'cursor-grab active:cursor-grabbing' : ''} ${it.archived ? 'opacity-50' : ''}`}
                 >
                   {it.media && it.media.length > 0 && <MediaThumb media={it.media} />}
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[12px] font-semibold capitalize">{it.channel?.type ?? it.content_type}</span>
-                    <span className="text-[11px]" style={{ opacity: 0.75 }}>{time}</span>
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    {(it.channels?.length ?? 0) > 0 ? (
+                      <span className="flex flex-wrap gap-1">
+                        {it.channels!.map((c) => (
+                          <span key={c.id} className="text-[11px] font-semibold capitalize rounded-full px-1.5 py-0.5" style={{ background: 'rgba(0,0,0,.10)' }}>{c.label ?? c.type}</span>
+                        ))}
+                      </span>
+                    ) : (
+                      <span className="text-[12px] font-semibold capitalize">{it.channel?.type ?? it.content_type}</span>
+                    )}
+                    <span className="text-[11px] shrink-0" style={{ opacity: 0.75 }}>{time}</span>
                   </div>
                   {it.archived && (
                     <div className="inline-block text-[10px] uppercase tracking-wide font-semibold rounded px-1.5 py-0.5 mb-1.5" style={{ background: 'rgba(0,0,0,.12)' }}>Archived</div>

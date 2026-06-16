@@ -30,6 +30,7 @@ type Row = {
   title: string
   clientName: string
   channel: string
+  channels: { id: string; type: string; label: string | null }[]
   status: string
   scheduled_at: string | null
   days: number
@@ -52,7 +53,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // returns exactly the agency's clients' posts across ALL of them.
   const { data: items } = await supabase
     .from('content_item')
-    .select('id, title, content_type, status, scheduled_at, updated_at, client_id, client:client_id ( name, status ), channel:channel_id ( type, label ), events:approval_event ( action, created_at )')
+    .select('id, title, content_type, status, scheduled_at, updated_at, client_id, client:client_id ( name, status ), channel:channel_id ( type, label ), channels:content_item_channel ( channel:channel_id ( id, type, label ) ), events:approval_event ( action, created_at )')
     .in('status', [...NEEDS_ACTION, ...AWAITING])
 
   const now = Date.now()
@@ -75,6 +76,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       title: it.title ?? 'Untitled',
       clientName: it.client?.name ?? '—',
       channel: it.channel?.label ?? it.channel?.type ?? it.content_type,
+      channels: (it.channels ?? []).map((r: any) => (Array.isArray(r.channel) ? r.channel[0] : r.channel)).filter(Boolean),
       status: it.status,
       scheduled_at: it.scheduled_at,
       days,
@@ -220,7 +222,7 @@ function Section({ title, empty, rows, aging }: { title: string; empty: string; 
                       {r.archived && <span className="text-[10px] uppercase tracking-wide font-semibold text-[#9398A1] border border-[#E2E2E5] rounded px-1.5 py-0.5 shrink-0">Archived</span>}
                     </div>
                     <div className="text-[12px] text-[#9398A1]">
-                      <span className="capitalize">{r.channel}</span> · {meta?.label ?? r.status} · {fmtDate(r.scheduled_at)}
+                      <span className="capitalize">{r.channels.length > 0 ? r.channels.map((c) => c.label ?? c.type).join(', ') : r.channel}</span> · {meta?.label ?? r.status} · {fmtDate(r.scheduled_at)}
                     </div>
                   </div>
                   <span className={`text-[12px] shrink-0 ${isAging ? 'text-[#E0572E] font-semibold' : 'text-[#9398A1]'}`}>

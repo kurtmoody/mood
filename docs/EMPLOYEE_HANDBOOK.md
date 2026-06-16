@@ -156,7 +156,9 @@ Clients see the same calendar idea, but only their own posts, and only from the 
 
 ## 8. Creating and editing content
 
-**Create a post:** from the calendar, start a new post. You set the client, the channel, a title, the date it's planned for, and the body (the actual copy). You can attach media and add asset links.
+**Create a post:** from the calendar, start a new post. You set the client, its **channels**, a title, the date it's planned for, and the body (the actual copy). You can attach media and add asset links.
+
+**One post, several channels.** A post can go to **more than one** of a client's channels — tick the ones you want when creating it, and change them anytime in the post's **Channels** section (it's a separate edit; you don't need to fork a version). It stays a single post with one approval, and its channels show as small chips on the calendar cards.
 
 **Edit a post:** open the post and edit it. **Important:** *how* an edit behaves depends on the post's status:
 - If the post is still **internal** (draft, internal review, or changes-requested), your edit just updates it in place.

@@ -57,7 +57,7 @@ export async function exportClientBundle(
       .select('id, first_name, surname, role, email, phone, is_primary, portal_access')
       .eq('client_id', clientId).order('created_at'),
     supabase.from('content_item')
-      .select('id, title, status, content_type, scheduled_at, created_at, current_version_id, channel:channel_id ( type, label )')
+      .select('id, title, status, content_type, scheduled_at, created_at, current_version_id, channel:channel_id ( type, label ), channels:content_item_channel ( channel:channel_id ( id, type, label ) )')
       .eq('client_id', clientId).order('scheduled_at'),
     supabase.from('task')
       .select('id, title, task_type, status, priority, owner_id, due_date, next_action, notes, created_at')
@@ -115,10 +115,14 @@ export async function exportClientBundle(
 
   const postRows = posts.map((p: any) => {
     const ch = first<any>(p.channel)
+    // The full channel set (0054) as a comma-separated list (label, falling back to type);
+    // the single primary channel is the fallback when the set is empty.
+    const set = (p.channels ?? []).map((r: any) => (Array.isArray(r.channel) ? r.channel[0] : r.channel)).filter(Boolean)
+    const channels = set.length > 0 ? set.map((c: any) => c.label ?? c.type).join(', ') : (ch?.label ?? ch?.type ?? '')
     const vc = contentByVersionId.get(p.current_version_id)
     return {
       id: p.id, title: p.title, status: p.status, content_type: p.content_type,
-      scheduled_at: p.scheduled_at, channel_type: ch?.type ?? '', channel_label: ch?.label ?? '',
+      scheduled_at: p.scheduled_at, channels,
       caption: vc?.body ?? '', visual_content: vc?.visual_content ?? '',
       created_at: p.created_at,
     }
@@ -151,7 +155,7 @@ export async function exportClientBundle(
       [['id'], ['first_name'], ['surname'], ['role'], ['email'], ['phone'], ['is_primary'], ['portal_access']]
         .map(([k]) => ({ key: k, header: k })), contactRows)),
     'posts.csv': strToU8(BOM + toCSV(
-      [['id'], ['title'], ['status'], ['content_type'], ['scheduled_at'], ['channel_type'], ['channel_label'], ['caption'], ['visual_content'], ['created_at']]
+      [['id'], ['title'], ['status'], ['content_type'], ['scheduled_at'], ['channels'], ['caption'], ['visual_content'], ['created_at']]
         .map(([k]) => ({ key: k, header: k })), postRows)),
     'comments.csv': strToU8(BOM + toCSV(
       [['id'], ['post_id'], ['post_title'], ['author_id'], ['author_name'], ['body'], ['created_at']]
