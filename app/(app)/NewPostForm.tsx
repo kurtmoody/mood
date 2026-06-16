@@ -30,7 +30,12 @@ export default function NewPostForm({
 }) {
   const [state, action, pending] = useActionState(createPostAction, initial)
   const [clientId, setClientId] = useState(defaultClientId)
+  const [channelIds, setChannelIds] = useState<string[]>([])
   const [when, setWhen] = useState(defaultDate)
+
+  function toggleChannel(id: string) {
+    setChannelIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
+  }
 
   useEffect(() => { if (state.ok) onClose() }, [state.ok]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -63,21 +68,26 @@ export default function NewPostForm({
 
           <div>
             <label className={labelCls}>Client *</label>
-            <select name="client_id" value={clientId} onChange={(e) => setClientId(e.target.value)} className={fieldCls}>
+            <select name="client_id" value={clientId} onChange={(e) => { setClientId(e.target.value); setChannelIds([]) }} className={fieldCls}>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
 
           <div>
-            <label className={labelCls}>Channel</label>
-            <select name="channel_id" defaultValue="" className={fieldCls}>
-              <option value="">No channel</option>
-              {channels.map((ch) => (
-                <option key={ch.id} value={ch.id}>
-                  {ch.label ? `${ch.label} (${cap(ch.type)})` : cap(ch.type)}
-                </option>
-              ))}
-            </select>
+            <label className={labelCls}>Channels</label>
+            <input type="hidden" name="channel_ids" value={channelIds.join(',')} />
+            {channels.length === 0 ? (
+              <p className="text-sm text-[#9398A1]">No channels for this client.</p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {channels.map((ch) => (
+                  <label key={ch.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={channelIds.includes(ch.id)} onChange={() => toggleChannel(ch.id)} className="accent-[#15171C]" />
+                    {ch.label ? `${ch.label} (${cap(ch.type)})` : cap(ch.type)}
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

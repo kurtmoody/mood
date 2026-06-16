@@ -22,14 +22,17 @@ export async function createPostAction(_prev: PostState, fd: FormData): Promise<
   const scheduledAt = str(fd, 'scheduled_at') // ISO string, converted client-side
   if (!scheduledAt) return { error: 'Scheduled date is required.', ok: false }
 
+  // Multi-channel (0054): the form submits a comma-separated channel_ids list. Empty → no channel.
+  const channelIds = ((fd.get('channel_ids') as string | null) ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+
   const { error } = await supabase.rpc('create_post', {
     p_client_id: clientId,
-    p_channel_id: str(fd, 'channel_id'),
     p_title: str(fd, 'title'),
     p_content_type: str(fd, 'content_type') ?? 'post',
     p_scheduled_at: scheduledAt,
     p_body: str(fd, 'body'),
     p_visual_content: str(fd, 'visual_content'),
+    p_channel_ids: channelIds,
   })
   if (error) return { error: rpcErrorMessage(error), ok: false }
 
@@ -95,6 +98,24 @@ export async function setPostMetaAction(
   return { error: null }
 }
 
+// Set a post's channel set (0054). Direct-call (array, not a form); agency-only enforced in the
+// RPC, which validates each channel belongs to the post's client, replaces the join rows, and
+// sets the denormalised channel_id to the first. Never forks a version or changes status.
+export async function setPostChannelsAction(
+  itemId: string,
+  channelIds: string[],
+): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not signed in.' }
+
+  const { error } = await supabase.rpc('set_post_channels', { p_item_id: itemId, p_channel_ids: channelIds })
+  if (error) return { error: rpcErrorMessage(error) }
+
+  revalidatePath('/')
+  return { error: null }
+}
+
 export async function updatePostAction(_prev: PostState, fd: FormData): Promise<PostState> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -106,7 +127,10 @@ export async function updatePostAction(_prev: PostState, fd: FormData): Promise<
   const { data, error } = await supabase.rpc('update_post', {
     p_item_id: itemId,
     p_title: str(fd, 'title'),
-    p_channel_id: str(fd, 'channel_id'),
+    // Channels are edited separately now (set_post_channels, 0054) — the edit form has no
+    // channel field. update_post still requires p_channel_id, and null preserves the existing
+    // channel via its coalesce, so caption/title/schedule edits never touch channels.
+    p_channel_id: null,
     p_scheduled_at: str(fd, 'scheduled_at'), // ISO string, converted client-side
     p_body: str(fd, 'body'),
     p_visual_content: str(fd, 'visual_content'),

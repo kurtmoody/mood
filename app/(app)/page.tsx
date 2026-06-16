@@ -82,7 +82,7 @@ export default async function Home({
   // status filter is defence-in-depth and helps the query planner.
   let itemsQuery = supabase
     .from('content_item')
-    .select('id, client_id, title, content_type, scheduled_at, status, current_version_id, channel_id, designer_id, design_status, drive_url, high_res_url, boost, ad_budget, date_posted, posted_url, channel:channel_id ( type, label ), versions:content_version!content_version_content_item_id_fkey ( id, body, visual_content, version_no, created_by, created_at, media ( id, storage_path, mime_type, created_at, sort_order ) ), events:approval_event ( id, version_id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id ), asset_links:post_asset_link ( id, label, url, sort_order ), tasks:task ( id, title, status, owner:owner_id ( full_name ) )')
+    .select('id, client_id, title, content_type, scheduled_at, status, current_version_id, channel_id, designer_id, design_status, drive_url, high_res_url, boost, ad_budget, date_posted, posted_url, channel:channel_id ( type, label ), channels:content_item_channel ( channel:channel_id ( id, type, label ) ), versions:content_version!content_version_content_item_id_fkey ( id, body, visual_content, version_no, created_by, created_at, media ( id, storage_path, mime_type, created_at, sort_order ) ), events:approval_event ( id, version_id, action, note, created_at, actor_id ), comments:comment ( id, body, created_at, author_id ), asset_links:post_asset_link ( id, label, url, sort_order ), tasks:task ( id, title, status, owner:owner_id ( full_name ) )')
     .in('client_id', selectedClientIds)
     .gte('scheduled_at', weekStartUTC)
     .lt('scheduled_at', weekEndUTC)
@@ -168,6 +168,8 @@ export default async function Home({
       body: current?.body ?? null,
       visual_content: current?.visual_content ?? null,
       version_no: current?.version_no ?? 1,
+      // The full channel set (0054); the single channel_id stays the primary for the cards.
+      channels: (it.channels ?? []).map((r: any) => (Array.isArray(r.channel) ? r.channel[0] : r.channel)).filter(Boolean),
       events, comments, media, versions: versionList,
       clientName: cli?.name ?? '',
       clientColour: cli ? clientColour(cli) : fallbackColour(it.client_id),

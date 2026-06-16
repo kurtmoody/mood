@@ -2,7 +2,9 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { setPostChannelsAction } from '@/app/(app)/postActions'
 import { STATUS, type Item } from './Calendar'
 import MentionInput, { type MentionCandidate } from './MentionInput'
 import { STATUS_COLOUR as TASK_STATUS_COLOUR } from '@/lib/taskConstants'
@@ -166,15 +168,71 @@ function CommentDeleteButton({ commentId, action }: { commentId: string; action:
   )
 }
 
+// Agency-only channel-set editor (0054). Checkboxes pre-ticked to the post's current set; Save
+// calls set_post_channels (no fork, no status change) then refreshes. set_post_channels requires
+// at least one channel, so Save is disabled when nothing is ticked.
+function ChannelsEditor({ item, channels }: { item: Item; channels: Channel[] }) {
+  const router = useRouter()
+  const current = item.channels ?? []
+  const [selected, setSelected] = useState<string[]>(current.map((c) => c.id))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Re-sync when a different post is opened.
+  useEffect(() => { setSelected((item.channels ?? []).map((c) => c.id)) }, [item.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggle(id: string) {
+    setSelected((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
+  }
+
+  const currentIds = current.map((c) => c.id)
+  const dirty = selected.length !== currentIds.length || selected.some((id) => !currentIds.includes(id))
+
+  async function save() {
+    if (selected.length === 0 || busy) return
+    setBusy(true); setError(null)
+    const r = await setPostChannelsAction(item.id, selected)
+    setBusy(false)
+    if (r.error) { setError(r.error); return }
+    router.refresh()
+  }
+
+  return (
+    <div className="mb-6">
+      <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2">Channels</div>
+      {channels.length === 0 ? (
+        <div className="text-sm text-[#9398A1]">No channels for this client.</div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {channels.map((c) => (
+            <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} className="accent-[#15171C]" />
+              {channelLabel(c)}
+            </label>
+          ))}
+        </div>
+      )}
+      {error && <p className="text-sm text-red-600 mt-1.5">{error}</p>}
+      {channels.length > 0 && (
+        <button
+          onClick={save}
+          disabled={busy || !dirty || selected.length === 0}
+          className="mt-2 text-xs font-semibold bg-[#15171C] text-white rounded-md px-3 py-1.5 disabled:opacity-50 cursor-pointer"
+        >
+          {busy ? 'Saving…' : 'Save channels'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function EditPostForm({
   item,
-  channels,
   action,
   onCancel,
   isFork,
 }: {
   item: Item
-  channels: Channel[]
   action: ActionFn
   onCancel: () => void
   isFork: boolean
@@ -197,13 +255,6 @@ function EditPostForm({
       <div>
         <label className={labelCls}>Title</label>
         <input name="title" defaultValue={item.title ?? ''} className={fieldCls} />
-      </div>
-      <div>
-        <label className={labelCls}>Channel</label>
-        <select name="channel_id" defaultValue={item.channel_id ?? ''} className={fieldCls}>
-          <option value="">No channel</option>
-          {channels.map((c) => <option key={c.id} value={c.id}>{channelLabel(c)}</option>)}
-        </select>
       </div>
       <div>
         <label className={labelCls}>Scheduled date &amp; time</label>
@@ -276,7 +327,6 @@ export default function Drawer({
   if (!item) return null
 
   const s = STATUS[item.status] ?? STATUS.draft
-  const channel = item.channel?.label ?? item.channel?.type ?? item.content_type
   const actions = ACTIONS[item.status] ?? []
   // Agency: all valid transitions for the status. Client: only approve /
   // request_changes, and only on a client_review post — never any agency transition.
@@ -298,7 +348,15 @@ export default function Drawer({
       <div className="absolute right-0 top-0 h-full w-full max-w-[440px] bg-white border-l border-[#ECECEE] shadow-xl flex flex-col animate-panel-in">
         <div className="flex items-start justify-between gap-3 px-6 py-5 border-b border-[#ECECEE]">
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold capitalize mb-1">{channel}</div>
+            {(item.channels?.length ?? 0) > 0 ? (
+              <div className="flex flex-wrap items-center gap-1 mb-1">
+                {item.channels!.map((c) => (
+                  <span key={c.id} className="text-[10px] uppercase tracking-wide text-[#5A5E66] bg-[#F4F4F6] rounded-full px-2 py-0.5">{c.label ?? cap(c.type)}</span>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">No channel</div>
+            )}
             <h2 className="text-lg font-bold leading-snug">{item.title ?? 'Untitled'}</h2>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -330,7 +388,7 @@ export default function Drawer({
 
         <div className="px-6 py-5 overflow-y-auto flex-1">
           {editing ? (
-            <EditPostForm item={item} channels={channels} action={updatePostAction} onCancel={() => setEditing(false)} isFork={editableAsFork} />
+            <EditPostForm item={item} action={updatePostAction} onCancel={() => setEditing(false)} isFork={editableAsFork} />
           ) : (
           <>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -347,6 +405,8 @@ export default function Drawer({
               </div>
             </div>
           </div>
+
+          {isAgency && <ChannelsEditor item={item} channels={channels} />}
 
           <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2">Visual content</div>
           {item.visual_content
