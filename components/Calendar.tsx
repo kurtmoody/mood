@@ -46,6 +46,7 @@ export type VersionDetail = {
   id: string
   version_no: number
   body: string | null
+  visual_content: string | null
   created_at: string
   author: string | null
   isCurrent: boolean
@@ -61,6 +62,7 @@ export type Item = {
   scheduled_at: string | null
   status: string
   body: string | null
+  visual_content: string | null
   channel_id: string | null
   current_version_id: string | null
   version_no?: number

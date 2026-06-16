@@ -103,7 +103,12 @@ export default function NewPostForm({
           </div>
 
           <div>
-            <label className={labelCls}>Body</label>
+            <label className={labelCls}>Visual content</label>
+            <textarea name="visual_content" rows={4} className={fieldCls} />
+          </div>
+
+          <div>
+            <label className={labelCls}>Caption</label>
             <textarea name="body" rows={6} className={fieldCls} />
           </div>
 

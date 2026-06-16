@@ -23,6 +23,7 @@ export default function ClientVersionHistory({ itemId }: { itemId: string }) {
         id: r.version_id,
         version_no: r.version_no,
         body: r.body,
+        visual_content: r.visual_content ?? null,
         created_at: r.created_at,
         author: null, // clients don't resolve agency names
         isCurrent: r.is_current,

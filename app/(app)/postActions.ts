@@ -29,6 +29,7 @@ export async function createPostAction(_prev: PostState, fd: FormData): Promise<
     p_content_type: str(fd, 'content_type') ?? 'post',
     p_scheduled_at: scheduledAt,
     p_body: str(fd, 'body'),
+    p_visual_content: str(fd, 'visual_content'),
   })
   if (error) return { error: rpcErrorMessage(error), ok: false }
 
@@ -108,6 +109,7 @@ export async function updatePostAction(_prev: PostState, fd: FormData): Promise<
     p_channel_id: str(fd, 'channel_id'),
     p_scheduled_at: str(fd, 'scheduled_at'), // ISO string, converted client-side
     p_body: str(fd, 'body'),
+    p_visual_content: str(fd, 'visual_content'),
   })
   if (error) return { error: rpcErrorMessage(error), ok: false }
 

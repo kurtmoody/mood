@@ -180,6 +180,10 @@ function EditPostForm({
         <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className={fieldCls} />
       </div>
       <div>
+        <label className={labelCls}>Visual content</label>
+        <textarea name="visual_content" rows={4} defaultValue={item.visual_content ?? ''} className={fieldCls} />
+      </div>
+      <div>
         <label className={labelCls}>Caption</label>
         <textarea name="body" rows={6} defaultValue={item.body ?? ''} className={fieldCls} />
       </div>
@@ -314,7 +318,12 @@ export default function Drawer({
             </div>
           </div>
 
-          <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2">Body</div>
+          <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2">Visual content</div>
+          {item.visual_content
+            ? <div className="text-sm leading-relaxed whitespace-pre-wrap text-[#15171C]">{item.visual_content}</div>
+            : <div className="text-sm text-[#9398A1] italic">No visual brief yet.</div>}
+
+          <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2">Caption</div>
           {item.body
             ? <div className="text-sm leading-relaxed whitespace-pre-wrap text-[#15171C]">{item.body}</div>
             : <div className="text-sm text-[#9398A1] italic">No content yet.</div>}
