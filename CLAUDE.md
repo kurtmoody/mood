@@ -28,15 +28,15 @@ Out of scope (do NOT build): publishing/scheduling to social networks, analytics
 
 ## File map
 - `app/(app)/` — route group for all authenticated pages, with `layout.tsx` (auth gate + `AppShell`), `loading.tsx` (route skeleton), `error.tsx`.
-  - `page.tsx` — client-aware Week/Month/Grid calendar (server). `CalendarBoard.tsx` — interactive shell (switcher, view toggle, nav, drawer, drag-reschedule). `NewPostForm.tsx`, `InvitePanel.tsx`. Server actions live next to their pages: `postActions.ts`, `approvalActions.ts`, `commentActions.ts`, `taskActions.ts`, `inviteActions.ts`, `internalNoteActions.ts`, `assetLinkActions.ts`, `viewPrefActions.ts`.
-  - `clients/` (list + `new/` + `ownership/`), `clients/[id]/` (detail/edit + Channels/Contacts/BrandAssets/Ownership/Timesheet sections + their `*Actions.ts`), `team/`, `tasks/` (list/kanban/calendar board), `dashboard/`, `reports/` (admin: capacity + profitability), `admin/` (access, costs, RACI).
+  - `page.tsx` — client-aware Week/Month/Grid calendar (server). `CalendarBoard.tsx` — interactive shell (switcher, view toggle, nav, drawer, drag-reschedule). `NewPostForm.tsx`, `InvitePanel.tsx`. Server actions live next to their pages: `postActions.ts`, `approvalActions.ts`, `commentActions.ts`, `taskActions.ts`, `inviteActions.ts`, `internalNoteActions.ts`, `assetLinkActions.ts`, `viewPrefActions.ts`, `timeLogActions.ts` (global "+ Log time").
+  - `clients/` (list + `new/` + `ownership/`), `clients/[id]/` (detail/edit + Channels/Contacts/BrandAssets/Deliverables/Ownership/Timesheet sections + their `*Actions.ts`), `team/`, `tasks/` (list/kanban/calendar board), `dashboard/`, `reports/` (all agency members; `ReportTabs` switches Time/Capacity/Profitability — Profitability admin-only), `admin/` (access, costs, RACI).
 - `app/login/page.tsx`, `app/auth/callback/page.tsx` — outside the group (no shell).
-- `components/` — shell: `AppShell`, `Sidebar`, `TopBar`, `UserMenu`, `NotificationBell`, `PageContainer`. Calendar: `Calendar` (week), `MonthCalendar`, `ContentGrid`, `Drawer` (post detail/edit/approve/comment/media/notes/tasks), `MediaSection`, `MediaThumb`. Reporting: `CapacityPlanner`, `ProfitabilityReport`, `TimesheetSection`. **`ui.ts` — shared button/field class constants; use these for any new controls.**
-- `lib/` — `supabase/{client,server,middleware}.ts`; `access.ts` (agency/client detection from membership); `week.ts` (Malta-tz dates); `media.ts`; `colour.ts` (client calendar colours); `capacity.ts`, `profitability.ts`, `reportRange.ts`; `taskConstants.ts`, `ownershipRoles.ts`, `viewColumns.ts`; `exportClient.ts` (pre-delete backup bundle).
+- `components/` — shell: `AppShell`, `Sidebar`, `TopBar`, `UserMenu`, `NotificationBell`, `PageContainer`, `LogTimeLauncher`/`LogTimeModal` (top-bar "+ Log time"). Calendar: `Calendar` (week), `MonthCalendar`, `ContentGrid`, `Drawer` (post detail/edit/approve/comment/media/notes/tasks), `MediaSection`, `MediaThumb`. Reporting: `ReportTabs`, `TimeReport`, `CapacityPlanner`, `ProfitabilityReport`, `TimesheetSection`. **`ui.ts` — shared button/field class constants; use these for any new controls.**
+- `lib/` — `supabase/{client,server,middleware}.ts`; `access.ts` (agency/client detection from membership); `week.ts` (Malta-tz dates incl. `maltaInputToISO` for datetime-local inputs); `media.ts`; `colour.ts` (client calendar colours); `capacity.ts`, `profitability.ts`, `timeReport.ts`, `reportRange.ts`; `taskConstants.ts`, `deliverableConstants.ts`, `ownershipRoles.ts`, `viewColumns.ts`; `exportClient.ts` (pre-delete backup bundle).
 - `proxy.ts` — calls updateSession. `schema.sql` — fresh-setup reference (see Migrations). `migrations/` — numbered SQL + pgTap tests.
 
 ## Migrations
-- Schema changes are numbered files `migrations/NNNN_name.sql`, run **manually** in the Supabase SQL editor (not auto-applied). Idempotent (`create … if not exists`, `drop policy if exists` then create, `create or replace`). Currently **0001–0049**.
+- Schema changes are numbered files `migrations/NNNN_name.sql`, run **manually** in the Supabase SQL editor (not auto-applied). Idempotent (`create … if not exists`, `drop policy if exists` then create, `create or replace`). Currently **0001–0051**.
 - `schema.sql` is the fresh-setup reference ONLY — it has a destructive reset block at the top; **never run it against the live DB**. New changes go in a migration, not schema.sql.
 - Security-sensitive migrations ship a pgTap test `NNNN_*_test.sql`, runnable in the hosted editor (no basejump): temp `_t` + `grant insert on _t to authenticated` + `plan()` BEFORE any role switch; act via `set local role authenticated` + a `request.jwt.claims` GUC; drop to `set local role postgres` (not reset) to read true state; aggregate via `union all`; `throws_ok(sql,'<sqlstate>')` 2-arg, `is_empty`/`isnt_empty` for silent RLS reads.
 
@@ -61,6 +61,7 @@ Added by 0019–0048 (headlines; read the migration for detail):
 - Production meta on posts (0042): designer, design_status, drive/high-res URLs, boost/ad budget, posted date/URL — powers the Grid view.
 - Money/reporting: `time_entry` (0044 — timesheets; readable by all agency members, **by design** — decided June 2026), task `value` (0045), `agency_internal.cost_per_hour` (0046 → relocated admin-only in 0047 because RLS can't hide a column). `retainer_amount` deliberately stays member-readable (decided June 2026) — do not relocate it.
 - 0048 — dropped the legacy permissive `client_internal_write` policy (last write side-door; predated the 0016 convention). 0049 — `extend_invite` (admin-only reset of the 7-day expiry).
+- 0050 — `update_client` defaults `p_status`/`p_timezone`/`p_currency` to null and coalesces each to the existing value (repo record of a live hand-edit; root-caused the status-revert). 0051 — `client_deliverable` (agency-only CRM: label/quantity/cadence/notes/sort_order; RLS = agency-for-client, no client path) + `add`/`update`/`delete`/`reorder_client_deliverable`.
 - Legacy `asset` table dropped (0029).
 
 ## Approval state machine (content_item.status)
@@ -69,7 +70,7 @@ Agency drives draft→internal_review→client_review. Client view can approve (
 
 ## Built
 - **App shell** — persistent sidebar + top bar (`app/(app)/layout.tsx`), pinnable on desktop, off-canvas drawer on mobile; nav gated by role (clients see only the calendar; agency pages hard-redirect non-agency).
-- **Client CRM** — `/clients` list + create (`create_client`); `/clients/[id]` detail/edit (`update_client`) with account owner from the team directory; `/team` directory (`add_team_member`); contacts CRUD (single-primary); brand assets CRUD. All via SECURITY DEFINER RPCs.
+- **Client CRM** — `/clients` list + create (`create_client`); `/clients/[id]` detail/edit (`update_client`) with account owner from the team directory; `/team` directory (`add_team_member`); contacts CRUD (single-primary); brand assets CRUD; agreed **deliverables** CRUD (`client_deliverable`, 0051 — label/quantity/cadence/notes). All via SECURITY DEFINER RPCs.
 - **Content engine** —
   - Client-aware **calendar**: real dated Week/Month views (Europe/Malta), Prev/Today/Next, state in the URL (`?client/?week/?month/?view`); click a post → detail drawer.
   - **Channels** per client (add/remove).
@@ -77,11 +78,13 @@ Agency drives draft→internal_review→client_review. Client view can approve (
   - **Approval workflow** (`transition_post`) — status machine, every move logged to approval_event; history timeline in the drawer.
   - **Comments** (`add_comment`/`delete_comment`).
   - **Media** — agency upload (image/video/pdf) to the private bucket; server-side signed-URL display (thumbnail on the card, gallery in the drawer); client view-only.
-- **Security (RLS/storage, all pgTap-proven)** — content read floor (0015), content tables RPC-only (0016), media table + storage policies status-gated (0018), write side-doors closed (0016, 0048). ~30 of 48 migrations carry pgTap tests.
+- **Security (RLS/storage, all pgTap-proven)** — content read floor (0015), content tables RPC-only (0016), media table + storage policies status-gated (0018), write side-doors closed (0016, 0048). ~33 of 51 migrations carry pgTap tests.
 - **Client portal** — access model + invite toggle (0013), claim-on-login (callback → `claim_client_access`), restricted client calendar + nav gating, client approve/request-changes in the drawer (`transition_post`, 0017), invite panel (0035).
 - **Tasks** — list/kanban/calendar board with filters, column preferences, owner/client/status deep-links; tasks can serve a post; capacity fields + job value.
 - **Notifications (in-app)** — bell + inbox, emitted from the RPC write paths. No email channel or preferences yet.
-- **Reporting (admin)** — dashboard ("needs your action"), capacity planner, profitability report (timesheets × flat agency cost rate × job value).
+- **Dashboard (agency)** — "needs your action" view: posts needing review / awaiting client, overdue + open-task breakdowns by status/owner/client.
+- **Reporting** — `/reports`, open to all agency members; `ReportTabs` shows ONE report at a time. **Time** (hours by person/client over a date range, distribution-framed) and **Capacity** (per-person + team utilisation % vs 40h/week, forward-looking `?cap` — moved here from the dashboard) are member-visible; **Profitability** (value − time-cost margins by client, date-ranged) is **admin-only** — the tab and its financial fetch render only for admins (a non-admin's `?report` is coerced off it). Money lives only on the Profitability tab.
+- **Global "+ Log time"** — top-bar modal (agency-only) to log a completed entry against any timesheet-enabled client; Job combobox picks an open task, free-texts a note (unattributed), or creates a task on the fly (owner = self); Malta-correct datetimes via `maltaInputToISO`, portaled to body.
 - **Table view** (calendar's third toggle, formerly "Grid"; `?view=table`, legacy `grid` links still parse) — all post fields incl. thumbnail, caption (read-only — caption edits stay in the drawer because they're versioned), production meta, derived PM; group-by selector (`?group=` client/pm/designer/status/platform/none), per-user column picker (view_key `content_table`), CSV export of the visible period.
 - **UI foundation** — design tokens + shared control constants (`components/ui.ts`, `globals.css @theme`), Geist, route-level loading skeleton + error boundary, dialog a11y + entrance motion.
 

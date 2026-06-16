@@ -77,7 +77,7 @@ lib/
   taskConstants.ts ownershipRoles.ts colour.ts   # shared constants
   viewColumns.ts           # column-preference mechanism (mergeColumns, 0037)
   exportClient.ts          # client data export → ZIP of CSVs (fflate; RLS-respecting reads)
-migrations/                # numbered SQL (0001–0047) + pgTap *_test.sql  ← source of truth for the DB
+migrations/                # numbered SQL (0001–0051) + pgTap *_test.sql  ← source of truth for the DB
 schema.sql                 # fresh-setup reference ONLY (destructive reset block — never run on live)
 proxy.ts                   # Next 16 middleware → updateSession
 supabase/functions/notify-email/index.ts   # Deno Edge Function: notification → Resend
@@ -341,7 +341,7 @@ draft ──submit_internal──▶ internal_review ──approve_internal─�
 ## 10. Migrations & testing
 
 - Schema changes are **numbered files** `migrations/NNNN_name.sql`, run **manually** in the Supabase SQL editor (not auto-applied). Idempotent: `create … if not exists`, `drop policy if exists` then create, `create or replace`.
-- Currently **0001–0047**. See `PROJECT_GUIDE.md` §15 for the one-line ledger of each. Recent: 0041 task subscriptions, 0042 production metadata + `set_post_meta`, 0043 capacity fields, 0044 timesheets, 0045 task job value, 0046 cost-per-hour, 0047 relocate cost rate to admin-only `agency_internal`. **0047 must run after 0046** (migrates from + drops the column it added).
+- Currently **0001–0051**. See `PROJECT_GUIDE.md` §15 for the one-line ledger of each. Recent: 0044 timesheets, 0045 task job value, 0046 cost-per-hour, 0047 relocate cost rate to admin-only `agency_internal` (**run after 0046** — migrates from + drops the column it added), 0048 close `client_internal` write side-door + RACI CHECK, 0049 `extend_invite`, 0050 `update_client` preserve status/timezone/currency on omit, 0051 `client_deliverable` table + RPCs.
 - Security-sensitive migrations ship a pgTap test `NNNN_*_test.sql`, runnable in the hosted SQL editor (no basejump). Proven pattern:
   - `create extension if not exists pgtap;`
   - temp `_t (seq int, line text)` + `select plan(N);` **before** any role switch.
@@ -410,6 +410,6 @@ App env in `.env.local` + Vercel; Edge Function secret `RESEND_API_KEY` (service
 10. **Finer permissions** — the `agency_admin` vs `agency_member` split is enforced for the Admin area and all high-stakes actions (RACI edit, role changes, invites, permanent deletes, cost rate, profitability). Still open: decide which routine actions (billing edits, etc.) should additionally require `agency_admin`.
 11. **Timesheets / profitability follow-ons** — no client-facing surface yet (`time_entry` is agency-only; `task.value_client_visible` is a stored gate with no client read path). Profitability `value` is **not** date-distributed (margins are partial for in-progress jobs over a narrow range — surfaced as a caveat, not yet modelled). Cost rate is a single flat agency rate (no per-person/role rates).
 
-*Done this cycle: invites (0035), team edit/deactivate + permanent delete (0034/0036), per-user column prefs (0037), drag-to-reschedule (0038), internal notes (0039), client archive/reactivate/delete (0040), task subscriptions + notifications (0041), content grid + production metadata (0042), task capacity fields + capacity planner (0043), internal timesheets (0044), job value/invoice (0045), agency cost-per-hour (0046) + its admin-only relocation to `agency_internal` (0047 — closed the member-readable cost-rate leak), the admin-only profitability report at `/reports`. Email delivery live via Resend.*
+*Done this cycle: invites (0035), team edit/deactivate + permanent delete (0034/0036), per-user column prefs (0037), drag-to-reschedule (0038), internal notes (0039), client archive/reactivate/delete (0040), task subscriptions + notifications (0041), content grid + production metadata (0042), task capacity fields + capacity planner (0043), internal timesheets (0044), job value/invoice (0045), agency cost-per-hour (0046) + its admin-only relocation to `agency_internal` (0047 — closed the member-readable cost-rate leak), the profitability report at `/reports`, closing the last `client_internal` write side-door + RACI CHECK (0048), `extend_invite` (0049), `update_client` preserve-on-omit (0050), agreed client deliverables (0051), the global "+ Log time" modal, and the `/reports` redesign into a tabbed shell open to all members (member-visible Time + Capacity, admin-only Profitability). Email delivery live via Resend.*
 
 *Keep this current: when you ship a migration or change the security model / RPC surface, update the relevant section here and in `PROJECT_GUIDE.md`.*
