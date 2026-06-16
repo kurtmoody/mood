@@ -2,9 +2,10 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Link2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { setPostChannelsAction } from '@/app/(app)/postActions'
+import { setPostChannelsAction, splitPostChannelAction } from '@/app/(app)/postActions'
 import { STATUS, type Item } from './Calendar'
 import MentionInput, { type MentionCandidate } from './MentionInput'
 import { STATUS_COLOUR as TASK_STATUS_COLOUR } from '@/lib/taskConstants'
@@ -173,6 +174,7 @@ function CommentDeleteButton({ commentId, action }: { commentId: string; action:
 // at least one channel, so Save is disabled when nothing is ticked.
 function ChannelsEditor({ item, channels }: { item: Item; channels: Channel[] }) {
   const router = useRouter()
+  const params = useSearchParams()
   const current = item.channels ?? []
   const [selected, setSelected] = useState<string[]>(current.map((c) => c.id))
   const [busy, setBusy] = useState(false)
@@ -197,6 +199,22 @@ function ChannelsEditor({ item, channels }: { item: Item; channels: Channel[] })
     router.refresh()
   }
 
+  // Tailor: peel this channel into its own independent draft (split_post_channel). Operates on
+  // the post's *saved* set (currentIds), not the unsaved checkbox state. On success, open the new
+  // draft via ?post= (which also refreshes the server data so both posts appear).
+  async function tailor(c: Channel) {
+    if (busy) return
+    const name = channelLabel(c)
+    if (!window.confirm(`Tailor ${name}? This creates a separate draft post for ${name} that you can edit and approve independently, and removes it from this post.`)) return
+    setBusy(true); setError(null)
+    const r = await splitPostChannelAction(item.id, c.id)
+    setBusy(false)
+    if ('error' in r) { setError(r.error); return }
+    const sp = new URLSearchParams(params.toString())
+    sp.set('post', r.newItemId)
+    router.push(`/?${sp.toString()}`)
+  }
+
   return (
     <div className="mb-6">
       <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-2">Channels</div>
@@ -205,10 +223,16 @@ function ChannelsEditor({ item, channels }: { item: Item; channels: Channel[] })
       ) : (
         <div className="flex flex-col gap-1.5">
           {channels.map((c) => (
-            <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} className="accent-[#15171C]" />
-              {channelLabel(c)}
-            </label>
+            <div key={c.id} className="flex items-center justify-between gap-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} className="accent-[#15171C]" />
+                {channelLabel(c)}
+              </label>
+              {/* Tailor only an attached channel, and only when there are 2+ to split from. */}
+              {current.length >= 2 && currentIds.includes(c.id) && (
+                <button type="button" onClick={() => tailor(c)} disabled={busy} className="text-[11px] text-[#5A5E66] hover:text-[#15171C] hover:underline disabled:opacity-50 cursor-pointer">Tailor</button>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -357,7 +381,10 @@ export default function Drawer({
             ) : (
               <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">No channel</div>
             )}
-            <h2 className="text-lg font-bold leading-snug">{item.title ?? 'Untitled'}</h2>
+            <h2 className="text-lg font-bold leading-snug flex items-center gap-1.5">
+              {item.title ?? 'Untitled'}
+              {item.post_group_id && <span title="Part of a split channel set" className="text-[#9398A1]"><Link2 size={14} aria-label="Part of a split channel set" /></span>}
+            </h2>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {!editing && editableInPlace && (

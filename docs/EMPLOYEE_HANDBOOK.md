@@ -160,6 +160,8 @@ Clients see the same calendar idea, but only their own posts, and only from the 
 
 **One post, several channels.** A post can go to **more than one** of a client's channels — tick the ones you want when creating it, and change them anytime in the post's **Channels** section (it's a separate edit; you don't need to fork a version). It stays a single post with one approval, and its channels show as small chips on the calendar cards.
 
+**Tailor a channel.** If one channel needs its own version — a different caption or visual — hit **Tailor** next to that channel in the post's **Channels** section. It splits that channel into its own separate **draft** post (a copy of the current caption, visual and media) that you edit and approve on its own; the channel leaves the original post, and a small link icon marks posts that came from the same split.
+
 **Edit a post:** open the post and edit it. **Important:** *how* an edit behaves depends on the post's status:
 - If the post is still **internal** (draft, internal review, or changes-requested), your edit just updates it in place.
 - If the post has **already been sent to the client** (client review, approved, scheduled, posted), editing creates a **new version** and sends the post back round for internal review first. This is on purpose — see §10. The app warns you before you do this.

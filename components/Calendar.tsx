@@ -68,6 +68,7 @@ export type Item = {
   version_no?: number
   channel: { type: string; label: string | null } | null
   channels?: { id: string; type: string; label: string | null }[]
+  post_group_id?: string | null
   events?: ApprovalEvent[]
   comments?: Comment[]
   media?: Media[]
@@ -191,7 +192,10 @@ export default function Calendar({
                     ) : (
                       <span className="text-[12px] font-semibold capitalize">{it.channel?.type ?? it.content_type}</span>
                     )}
-                    <span className="text-[11px] shrink-0" style={{ opacity: 0.75 }}>{time}</span>
+                    <span className="text-[11px] shrink-0 flex items-center gap-1" style={{ opacity: 0.75 }}>
+                      {it.post_group_id && <span title="Part of a split channel set"><Link2 size={11} aria-label="Part of a split channel set" /></span>}
+                      {time}
+                    </span>
                   </div>
                   {it.archived && (
                     <div className="inline-block text-[10px] uppercase tracking-wide font-semibold rounded px-1.5 py-0.5 mb-1.5" style={{ background: 'rgba(0,0,0,.12)' }}>Archived</div>

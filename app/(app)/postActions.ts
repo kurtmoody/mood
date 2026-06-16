@@ -116,6 +116,32 @@ export async function setPostChannelsAction(
   return { error: null }
 }
 
+// Tailor a channel off a multi-channel post (0055): split_post_channel peels p_channel_id into
+// its own draft post and returns the new id + the {old_path,new_path} media pairs. We copy each
+// storage object with the SAME loop/bucket as the fork copy (log-and-skip — a partial copy is
+// recoverable, not corrupting), then the caller opens the new draft. Agency-only (RPC-enforced).
+export async function splitPostChannelAction(
+  itemId: string,
+  channelId: string,
+): Promise<{ ok: true; newItemId: string } | { error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not signed in.' }
+
+  const { data, error } = await supabase.rpc('split_post_channel', { p_item_id: itemId, p_channel_id: channelId })
+  if (error) return { error: rpcErrorMessage(error) }
+
+  const result = (data ?? {}) as { new_item_id?: string; media?: { old_path: string; new_path: string }[] }
+  for (const { old_path, new_path } of result.media ?? []) {
+    const { error: copyErr } = await supabase.storage.from('content-media').copy(old_path, new_path)
+    if (copyErr) console.error(`split_post_channel: media copy failed ${old_path} → ${new_path}: ${copyErr.message}`)
+  }
+
+  revalidatePath('/')
+  if (!result.new_item_id) return { error: 'Split did not return a new post.' }
+  return { ok: true, newItemId: result.new_item_id }
+}
+
 export async function updatePostAction(_prev: PostState, fd: FormData): Promise<PostState> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
