@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bell, Eye, Check, PencilLine, MessageSquare, UserPlus, ListChecks, type LucideIcon } from 'lucide-react'
+import { Bell, Eye, Check, PencilLine, MessageSquare, UserPlus, ListChecks, AtSign, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { maltaDate, mondayOf } from '@/lib/week'
 
@@ -23,6 +23,7 @@ const TYPE_ICON: Record<string, LucideIcon> = {
   comment: MessageSquare,
   task_assigned: UserPlus,
   task_status: ListChecks,
+  mention: AtSign,
 }
 
 function timeAgo(iso: string) {

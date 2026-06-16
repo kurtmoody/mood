@@ -230,6 +230,8 @@ There are **two** separate places to write on a post — don't mix them up:
 
 Rule of thumb: if it's for the client, it's a **comment**; if it's for the team, it's an **internal note**.
 
+**@-mentions.** In either box, type **`@`** and start a name to tag someone — pick them from the list. In an **internal note** you can only tag **teammates**; in a **comment** you can tag **teammates or the client's contacts**. Anyone you tag gets notified (bell + email, see §18). Tagging yourself doesn't notify you.
+
 ---
 
 ## 13. The client portal
@@ -359,6 +361,7 @@ Mood notifies the right people at the moments that matter (it's deliberately qui
 - A post is **sent to a client** → the client is notified ("ready for your review").
 - A client **approves** or **requests changes** → the agency is notified.
 - A **comment** is added → the other side is notified.
+- You're **@-mentioned** in a comment or an internal note → you're notified (see §12).
 - A **task** is **assigned** or its **status changes** → the task's subscribers are notified (see §16). To stay quiet, only the meaningful task moments are emailed (assigned, Complete, Waiting on Client, On Hold, Ready for Review); the rest are in-app only.
 
 You're never notified about your **own** action.
