@@ -2,7 +2,9 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import { STATUS, type Item } from './Calendar'
+import MentionInput, { type MentionCandidate } from './MentionInput'
 import { STATUS_COLOUR as TASK_STATUS_COLOUR } from '@/lib/taskConstants'
 import MediaSection from './MediaSection'
 import AssetLinksSection from './AssetLinksSection'
@@ -89,20 +91,48 @@ function formatShort(iso: string) {
 
 const initial: ActionState = { error: null, ok: false }
 
-function AddCommentForm({ itemId, action }: { itemId: string; action: ActionFn }) {
+function AddCommentForm({ itemId, clientId, action }: { itemId: string; clientId: string; action: ActionFn }) {
   const [state, formAction, pending] = useActionState(action, initial)
   const [body, setBody] = useState('')
-  useEffect(() => { if (state.ok) setBody('') }, [state.ok])
+  const [mentions, setMentions] = useState<string[]>([])
+  const [candidates, setCandidates] = useState<MentionCandidate[]>([])
+  useEffect(() => { if (state.ok) { setBody(''); setMentions([]) } }, [state.ok])
+
+  // Mentionable people for THIS post: agency team members with a login + the post's client
+  // contacts linked to a portal user. Fetched RLS-respectingly — a client-portal commenter can
+  // read neither table, so their picker is simply empty (acceptable in v1). The RPC re-checks.
+  useEffect(() => {
+    let active = true
+    const supabase = createClient()
+    ;(async () => {
+      const [{ data: team }, { data: contacts }] = await Promise.all([
+        supabase.from('team_member').select('user_id, full_name'),
+        supabase.from('client_contact').select('user_id, first_name, surname').eq('client_id', clientId).not('user_id', 'is', null),
+      ])
+      if (!active) return
+      const byId = new Map<string, MentionCandidate>()
+      for (const t of team ?? []) if ((t as any).user_id) byId.set((t as any).user_id, { userId: (t as any).user_id, name: (t as any).full_name })
+      for (const c of contacts ?? []) if ((c as any).user_id) {
+        const name = [(c as any).first_name, (c as any).surname].filter(Boolean).join(' ') || 'Client contact'
+        byId.set((c as any).user_id, { userId: (c as any).user_id, name })
+      }
+      setCandidates([...byId.values()])
+    })()
+    return () => { active = false }
+  }, [clientId])
 
   return (
     <form action={formAction} className="mt-4">
       <input type="hidden" name="item_id" value={itemId} />
-      <textarea
-        name="body"
+      <input type="hidden" name="body" value={body} />
+      <input type="hidden" name="mentions" value={mentions.join(',')} />
+      <MentionInput
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={setBody}
+        onMentionsChange={setMentions}
+        candidates={candidates}
         rows={2}
-        placeholder="Add a comment"
+        placeholder="Add a comment — @ to mention"
         className="w-full border border-[#E2E2E5] rounded-lg px-3 py-2 text-sm bg-white"
       />
       {state.error && <p className="text-sm text-red-600 mt-2">{state.error}</p>}
@@ -447,7 +477,7 @@ export default function Drawer({
                 ))}
               </ul>
             )}
-            <AddCommentForm itemId={item.id} action={addCommentAction} />
+            <AddCommentForm itemId={item.id} clientId={item.client_id} action={addCommentAction} />
           </div>
           </>
           )}

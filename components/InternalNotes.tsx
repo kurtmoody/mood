@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { addInternalNoteAction, updateInternalNoteAction, deleteInternalNoteAction } from '@/app/(app)/internalNoteActions'
+import MentionInput, { type MentionCandidate } from './MentionInput'
 
 type Note = {
   id: string
@@ -30,7 +31,9 @@ export default function InternalNotes({
 }) {
   const [notes, setNotes] = useState<Note[]>([])
   const [names, setNames] = useState<Record<string, string>>({})
+  const [candidates, setCandidates] = useState<MentionCandidate[]>([])
   const [draft, setDraft] = useState('')
+  const [mentions, setMentions] = useState<string[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editBody, setEditBody] = useState('')
   const [busy, setBusy] = useState(false)
@@ -50,8 +53,14 @@ export default function InternalNotes({
     if (nErr) { setError(nErr.message); return }
     setNotes((rows as Note[]) ?? [])
     const map: Record<string, string> = {}
-    for (const t of team ?? []) if ((t as any).user_id) map[(t as any).user_id] = (t as any).full_name
+    // Internal notes can only mention agency team members with a login (never client contacts).
+    const cands: MentionCandidate[] = []
+    for (const t of team ?? []) if ((t as any).user_id) {
+      map[(t as any).user_id] = (t as any).full_name
+      cands.push({ userId: (t as any).user_id, name: (t as any).full_name })
+    }
     setNames(map)
+    setCandidates(cands)
   }, [parentType, parentId])
 
   useEffect(() => { load() }, [load])
@@ -62,10 +71,10 @@ export default function InternalNotes({
   async function add() {
     if (!draft.trim() || busy) return
     setBusy(true); setError(null)
-    const r = await addInternalNoteAction(parentType, parentId, draft)
+    const r = await addInternalNoteAction(parentType, parentId, draft, mentions)
     setBusy(false)
     if (r.error) { setError(r.error); return }
-    setDraft('')
+    setDraft(''); setMentions([])
     load()
   }
 
@@ -132,11 +141,13 @@ export default function InternalNotes({
         </ul>
       )}
 
-      <textarea
+      <MentionInput
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={setDraft}
+        onMentionsChange={setMentions}
+        candidates={candidates}
         rows={2}
-        placeholder="Add an internal note"
+        placeholder="Add an internal note — @ to mention"
         className="w-full border border-[#E2E2E5] rounded-lg px-2.5 py-1.5 text-sm bg-white"
       />
       <div className="flex items-center justify-between mt-1.5">

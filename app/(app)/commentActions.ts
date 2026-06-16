@@ -22,7 +22,11 @@ export async function addCommentAction(_prev: CommentState, fd: FormData): Promi
   if (!itemId) return { error: 'Missing post.', ok: false }
   if (!body) return { error: 'Comment cannot be empty.', ok: false }
 
-  const { error } = await supabase.rpc('add_comment', { p_item_id: itemId, p_body: body })
+  // Mentions: a hidden field of comma-separated user ids (the picker's authoritative list).
+  // No ids → empty array → existing behaviour unchanged. The RPC enforces who may be mentioned.
+  const mentions = ((fd.get('mentions') as string | null) ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+
+  const { error } = await supabase.rpc('add_comment', { p_item_id: itemId, p_body: body, p_mentions: mentions })
   if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath('/')
