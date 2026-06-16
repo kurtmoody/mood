@@ -110,7 +110,7 @@ Core tables live in `schema.sql`; everything else is added by numbered migration
 |---|---|---|
 | `channel` | A publishing channel per client | `id`, `client_id`, `type` (instagram/facebook/linkedin/blog/newsletter/…), `label`. |
 | `content_item` | A planned post | `id`, `client_id`, `channel_id`, `title`, `content_type`, `scheduled_at`, `status` (**enum `content_status`**), `current_version_id` (→ content_version, FK added 0021), `created_by`, `updated_at`. **Production metadata (0042):** `designer_id` (→ team_member, set null — directory ref, login not required), `design_status`, `drive_url`, `high_res_url`, `boost` (bool default false), `ad_budget` (numeric), `date_posted` (date), `posted_url`. Written via `set_post_meta` (no fork), never `update_post`. |
-| `content_version` | Versioned body of a post (0021) | `id`, `content_item_id`, `version_no` (unique per item via `uq_version_no`), `body`, `internal_note`, `created_by`, `created_at`. |
+| `content_version` | Versioned body of a post (0021) | `id`, `content_item_id`, `version_no` (unique per item via `uq_version_no`), `body`, `visual_content` (0052 — a second versioned, client-visible content field; the Caption is `body`, Visual content is `visual_content`), `internal_note`, `created_by`, `created_at`. |
 | `comment` | A comment on a post | `id`, `content_item_id`, `author_id`, `body`, `created_at`. |
 | `approval_event` | Audit log of every transition | `id`, `content_item_id`, `version_id`, `actor_id`, `action`, `note`, `created_at`. |
 | `media` | Agency-uploaded files (0018, +`sort_order` 0024) | `version_id` (→ content_version, **on delete cascade**), `storage_path` (**unique**), `mime_type`, `size_bytes`, `created_by`, `created_at`, `sort_order`. Private `content-media` bucket. |

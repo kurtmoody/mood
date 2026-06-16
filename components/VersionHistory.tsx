@@ -65,6 +65,16 @@ export default function VersionHistory({ versions }: { versions: VersionDetail[]
                 </div>
               )}
 
+              {v.visual_content && (
+                <div className="mb-2">
+                  <div className="text-[10px] uppercase tracking-wide text-[#9398A1] font-semibold mb-0.5">Visual content</div>
+                  <div className="text-sm whitespace-pre-wrap text-[#15171C]">{v.visual_content}</div>
+                </div>
+              )}
+
+              {v.visual_content && (
+                <div className="text-[10px] uppercase tracking-wide text-[#9398A1] font-semibold mb-0.5">Caption</div>
+              )}
               {v.body
                 ? <div className="text-sm whitespace-pre-wrap text-[#15171C]">{v.body}</div>
                 : <div className="text-sm text-[#9398A1] italic">No content.</div>}

@@ -74,6 +74,7 @@ create table public.content_version (
   content_item_id uuid not null references public.content_item(id) on delete cascade,
   version_no      int not null default 1,
   body            text,
+  visual_content  text,
   internal_note   text,
   created_by      uuid references auth.users(id),
   created_at      timestamptz default now()

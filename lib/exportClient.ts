@@ -57,7 +57,7 @@ export async function exportClientBundle(
       .select('id, first_name, surname, role, email, phone, is_primary, portal_access')
       .eq('client_id', clientId).order('created_at'),
     supabase.from('content_item')
-      .select('id, title, status, content_type, scheduled_at, created_at, channel:channel_id ( type, label )')
+      .select('id, title, status, content_type, scheduled_at, created_at, current_version_id, channel:channel_id ( type, label )')
       .eq('client_id', clientId).order('scheduled_at'),
     supabase.from('task')
       .select('id, title, task_type, status, priority, owner_id, due_date, next_action, notes, created_at')
@@ -68,6 +68,18 @@ export async function exportClientBundle(
   const posts = postsRaw ?? []
   const postIds = posts.map((p: any) => p.id)
   const postTitleById = new Map<string, string>(posts.map((p: any) => [p.id, p.title ?? '']))
+
+  // Caption + visual content live on content_version. Embedding is avoided here because
+  // content_item↔content_version has two FKs (ambiguous embed); a keyed second query is simpler.
+  const currentVersionIds = posts.map((p: any) => p.current_version_id).filter(Boolean)
+  const contentByVersionId = new Map<string, { body: string | null; visual_content: string | null }>()
+  if (currentVersionIds.length > 0) {
+    const { data: vers } = await supabase
+      .from('content_version')
+      .select('id, body, visual_content')
+      .in('id', currentVersionIds)
+    for (const v of vers ?? []) contentByVersionId.set(v.id, { body: v.body ?? null, visual_content: v.visual_content ?? null })
+  }
 
   // Comments + internal notes are scoped to this client's posts.
   const [{ data: comments }, { data: notes }] = await Promise.all([
@@ -103,9 +115,11 @@ export async function exportClientBundle(
 
   const postRows = posts.map((p: any) => {
     const ch = first<any>(p.channel)
+    const vc = contentByVersionId.get(p.current_version_id)
     return {
       id: p.id, title: p.title, status: p.status, content_type: p.content_type,
       scheduled_at: p.scheduled_at, channel_type: ch?.type ?? '', channel_label: ch?.label ?? '',
+      caption: vc?.body ?? '', visual_content: vc?.visual_content ?? '',
       created_at: p.created_at,
     }
   })
@@ -137,7 +151,7 @@ export async function exportClientBundle(
       [['id'], ['first_name'], ['surname'], ['role'], ['email'], ['phone'], ['is_primary'], ['portal_access']]
         .map(([k]) => ({ key: k, header: k })), contactRows)),
     'posts.csv': strToU8(BOM + toCSV(
-      [['id'], ['title'], ['status'], ['content_type'], ['scheduled_at'], ['channel_type'], ['channel_label'], ['created_at']]
+      [['id'], ['title'], ['status'], ['content_type'], ['scheduled_at'], ['channel_type'], ['channel_label'], ['caption'], ['visual_content'], ['created_at']]
         .map(([k]) => ({ key: k, header: k })), postRows)),
     'comments.csv': strToU8(BOM + toCSV(
       [['id'], ['post_id'], ['post_title'], ['author_id'], ['author_name'], ['body'], ['created_at']]

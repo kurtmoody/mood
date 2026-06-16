@@ -172,7 +172,7 @@ Core tables are defined in `schema.sql`; later tables/columns are added by migra
 | `membership` | user ↔ scope, with role | `user_id`, `scope_type` (`agency`/`client`), `scope_id`, `role` — the Postgres **enum `public.member_role`** (`agency_admin`/`agency_member`/`client_approver`/`client_viewer`), so role values are DB-constrained (hence `set_member_role` casts `p_role::public.member_role`). |
 | `channel` | A publishing channel per client | `id`, `client_id`, `type` (instagram/facebook/linkedin/blog/newsletter), `label` |
 | `content_item` | A planned post | `id`, `client_id`, `channel_id`, `title`, `content_type`, `scheduled_at`, `status`, `current_version_id` (→ content_version, FK added 0021), `created_by`, `updated_at`. **Production metadata (0042):** `designer_id` (→ team_member **on delete set null** — directory ref, login not required), `design_status`, `drive_url`, `high_res_url`, `boost` (bool, default false), `ad_budget` (numeric), `date_posted` (date), `posted_url`. Written via `set_post_meta`, **never** `update_post` (see §16). |
-| `content_version` | Versioned body of a post | `id`, `content_item_id`, `version_no` (unique per item, `uq_version_no` 0021), `body`, `internal_note`, `created_by`, `created_at` |
+| `content_version` | Versioned body of a post | `id`, `content_item_id`, `version_no` (unique per item, `uq_version_no` 0021), `body`, `visual_content` (0052 — a second versioned, client-visible content field; the Caption is `body`, Visual content is `visual_content`), `internal_note`, `created_by`, `created_at` |
 | `comment` | A comment on a post | `id`, `content_item_id`, `author_id`, `body`, `created_at` |
 | `approval_event` | Audit log of every transition | `id`, `content_item_id`, `version_id`, `actor_id`, `action`, `note`, `created_at` |
 
@@ -633,6 +633,7 @@ Numbered SQL files in `migrations/`, run **manually** in the Supabase SQL editor
 | 0049 | extend_invite (+test) | `extend_invite` — admin-only reset of an invite's 7-day expiry. |
 | 0050 | update_client_preserve_status (+test) | `update_client` defaults `p_status`/`p_timezone`/`p_currency` to null and coalesces each to the existing value, so a field the caller omits is preserved — root-causes the status-revert. Repo record of a live hand-edit. |
 | 0051 | client_deliverables (+test) | `client_deliverable` table (agency-only CRM: `label`/`quantity`/`cadence`/`notes`/`sort_order`; RLS = agency-for-client, no client path) + `add`/`update`/`delete`/`reorder_client_deliverable` RPCs. Records agreed deliverables per client (retainers). No `client_visible` flag in v1. |
+| 0052 | post_caption_visual | Adds `content_version.visual_content` (a second versioned, client-visible content field) + extends `create_post` / `update_post` / `get_post_versions` to read/write it. UI splits the post body into Visual content + Caption. |
 
 > `schema.sql` is the fresh-setup reference **only** — it has a destructive reset block at the top; **never run it against the live DB.** New changes go in a migration.
 
