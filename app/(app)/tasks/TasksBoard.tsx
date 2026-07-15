@@ -7,7 +7,7 @@ import { Check, Pencil, Trash2 } from 'lucide-react'
 import { TASK_TYPES, TASK_STATUSES, TASK_PRIORITIES, STATUS_COLOUR, PRIORITY_COLOUR } from '@/lib/taskConstants'
 import { createTaskAction, updateTaskAction, deleteTaskAction, type TaskInput } from '../taskActions'
 import { setViewPreferenceAction } from '../viewPrefActions'
-import { fmtTaskDate, taskToday, taskToInput, type Task, type Member, type ClientOpt } from './types'
+import { fmtTaskDate, taskToday, taskToInput, type Task, type Member, type ClientOpt, type CampaignOpt } from './types'
 import { TASK_COLUMNS, TASK_VIEW_KEY } from './columns'
 import { mergeColumns, toConfig, type ColumnConfig, type ResolvedColumn } from '@/lib/viewColumns'
 import ColumnPicker from '@/components/ColumnPicker'
@@ -90,12 +90,13 @@ function taskCell(key: string, t: Task) {
   }
 }
 
-function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, currentUserId, onClose, onSaved }: {
+function TaskModal({ task, seed, servesLabel, members, clients, campaigns, leadPmByClient, currentUserId, onClose, onSaved }: {
   task: Task | null
   seed?: Partial<TaskInput>
   servesLabel: string | null
   members: Member[]
   clients: ClientOpt[]
+  campaigns: CampaignOpt[]
   leadPmByClient: Record<string, string | null>
   currentUserId: string
   onClose: () => void
@@ -105,13 +106,16 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
     client_id: null, task_type: null, title: '', owner_id: null,
     status: 'Not Started', priority: 'Medium', due_date: null, next_action: null, notes: null,
     content_item_id: null, estimated_hours: null, start_date: null,
-    value: null, value_client_visible: false, invoice_status: 'not_invoiced', ...seed,
+    value: null, value_client_visible: false, invoice_status: 'not_invoiced', campaign_id: null, ...seed,
   })
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const set = <K extends keyof TaskInput>(k: K, v: TaskInput[K]) => setForm((f) => ({ ...f, [k]: v }))
+  // Campaigns belong to a client — a task's campaign must share its client (RPC-enforced).
+  const clientCampaigns = form.client_id ? campaigns.filter((c) => c.client_id === form.client_id) : []
   function onClientChange(clientId: string | null) {
-    setForm((f) => ({ ...f, client_id: clientId, owner_id: clientId ? leadPmByClient[clientId] ?? null : f.owner_id }))
+    // Changing client invalidates any picked campaign (it belonged to the old client).
+    setForm((f) => ({ ...f, client_id: clientId, campaign_id: null, owner_id: clientId ? leadPmByClient[clientId] ?? null : f.owner_id }))
   }
   async function submit() {
     if (!form.title.trim()) { setError('Title is required.'); return }
@@ -138,6 +142,13 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
             <select value={form.client_id ?? ''} onChange={(e) => onClientChange(e.target.value || null)} className={fieldCls}>
               <option value="">No client / internal</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Campaign</label>
+            <select value={form.campaign_id ?? ''} onChange={(e) => set('campaign_id', e.target.value || null)} disabled={!form.client_id} className={fieldCls}>
+              <option value="">{form.client_id ? 'No campaign' : 'Pick a client first'}</option>
+              {clientCampaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div>
@@ -224,10 +235,11 @@ function TaskModal({ task, seed, servesLabel, members, clients, leadPmByClient, 
 
 type ModalState = { open: boolean; task: Task | null; seed?: Partial<TaskInput>; servesLabel: string | null }
 
-export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient, currentUserId, loadError, prefill, initialView, initialOwner, initialStatus, initialClient, savedColumns }: {
+export default function TasksBoard({ tasks, teamMembers, clients, campaigns, leadPmByClient, currentUserId, loadError, prefill, initialView, initialOwner, initialStatus, initialClient, savedColumns }: {
   tasks: Task[]
   teamMembers: Member[]
   clients: ClientOpt[]
+  campaigns: CampaignOpt[]
   leadPmByClient: Record<string, string | null>
   currentUserId: string
   loadError: boolean
@@ -425,6 +437,7 @@ export default function TasksBoard({ tasks, teamMembers, clients, leadPmByClient
           servesLabel={modal.servesLabel}
           members={teamMembers}
           clients={clients}
+          campaigns={campaigns}
           leadPmByClient={leadPmByClient}
           currentUserId={currentUserId}
           onClose={() => setModal({ open: false, task: null, servesLabel: null })}

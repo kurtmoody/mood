@@ -8,6 +8,7 @@ import type { Item } from './Calendar'
 import { labelCls, fieldClsSm as fieldCls, btnPrimarySm } from '@/components/ui'
 
 type TeamOpt = { id: string; full_name: string }
+type CampaignOpt = { id: string; name: string }
 
 // Agency-only production metadata for a post (Monday "content grid" fields). Self-contained:
 // fetches the Designer options (all active team members, incl. directory-only) and the
@@ -16,8 +17,10 @@ export default function ProductionDetails({ item, clientId }: { item: Item; clie
   const router = useRouter()
   const [team, setTeam] = useState<TeamOpt[]>([])
   const [pmName, setPmName] = useState<string | null>(null)
+  const [campaigns, setCampaigns] = useState<CampaignOpt[]>([])
 
   const [designerId, setDesignerId] = useState<string>(item.designer_id ?? '')
+  const [campaignId, setCampaignId] = useState<string>(item.campaign_id ?? '')
   const [designStatus, setDesignStatus] = useState<string>(item.design_status ?? '')
   const [driveUrl, setDriveUrl] = useState<string>(item.drive_url ?? '')
   const [highResUrl, setHighResUrl] = useState<string>(item.high_res_url ?? '')
@@ -33,6 +36,7 @@ export default function ProductionDetails({ item, clientId }: { item: Item; clie
   // Re-sync local fields when a different post is opened.
   useEffect(() => {
     setDesignerId(item.designer_id ?? '')
+    setCampaignId(item.campaign_id ?? '')
     setDesignStatus(item.design_status ?? '')
     setDriveUrl(item.drive_url ?? '')
     setHighResUrl(item.high_res_url ?? '')
@@ -46,14 +50,17 @@ export default function ProductionDetails({ item, clientId }: { item: Item; clie
   useEffect(() => {
     const supabase = createClient()
     ;(async () => {
-      const [{ data: members }, { data: own }] = await Promise.all([
+      const [{ data: members }, { data: own }, { data: camps }] = await Promise.all([
         // ALL active team members — directory-only members (no login) can be designers too.
         supabase.from('team_member').select('id, full_name').eq('is_active', true).order('full_name'),
         supabase.from('client_ownership').select('lead_pm:lead_pm_id ( full_name )').eq('client_id', clientId).maybeSingle(),
+        // This client's open campaigns (closed ones are history, not assignment targets).
+        supabase.from('campaign').select('id, name').eq('client_id', clientId).neq('phase', 'closed').order('created_at', { ascending: false }),
       ])
       setTeam((members as TeamOpt[]) ?? [])
       const pm = (own as any)?.lead_pm
       setPmName((Array.isArray(pm) ? pm[0]?.full_name : pm?.full_name) ?? null)
+      setCampaigns((camps as CampaignOpt[]) ?? [])
     })()
   }, [clientId])
 
@@ -74,6 +81,7 @@ export default function ProductionDetails({ item, clientId }: { item: Item; clie
       ad_budget: budget,
       date_posted: datePosted || null,
       posted_url: postedUrl.trim() || null,
+      campaign_id: campaignId || null,
     })
     setBusy(false)
     if (r.error) { setError(r.error); return }
@@ -87,6 +95,15 @@ export default function ProductionDetails({ item, clientId }: { item: Item; clie
     <div className="mt-7 pt-5 border-t border-[#ECECEE]">
       <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-3">Production details</div>
       <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <label className={labelCls}>Campaign</label>
+          <select value={campaignId} onChange={(e) => setCampaignId(e.target.value)} className={fieldCls}>
+            <option value="">No campaign</option>
+            {/* Keep the current campaign selectable even if it's since been closed (not in the list). */}
+            {campaignId && !campaigns.some((c) => c.id === campaignId) && <option value={campaignId}>Current campaign</option>}
+            {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
         <div>
           <label className={labelCls}>Designer</label>
           <select value={designerId} onChange={(e) => setDesignerId(e.target.value)} className={fieldCls}>

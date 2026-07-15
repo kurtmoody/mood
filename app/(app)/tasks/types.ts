@@ -19,6 +19,7 @@ export type Task = {
   value: number | null
   value_client_visible: boolean
   invoice_status: string
+  campaign_id: string | null
   clientName: string | null
   clientColour: string | null
   ownerName: string | null
@@ -28,6 +29,7 @@ export type Task = {
 
 export type Member = { id: string; full_name: string; user_id: string | null }
 export type ClientOpt = { id: string; name: string; colour: string }
+export type CampaignOpt = { id: string; name: string; client_id: string }
 
 export function taskToInput(t: Task): TaskInput {
   return {
@@ -36,6 +38,7 @@ export function taskToInput(t: Task): TaskInput {
     notes: t.notes, content_item_id: t.content_item_id,
     estimated_hours: t.estimated_hours, start_date: t.start_date,
     value: t.value, value_client_visible: t.value_client_visible, invoice_status: t.invoice_status,
+    campaign_id: t.campaign_id,
   }
 }
 

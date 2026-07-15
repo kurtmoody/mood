@@ -25,13 +25,15 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
   // All independent — one parallel round. RLS scopes task to the agency; single-FK
   // embeds (client/owner/content) are unambiguous.
-  const [{ data: tasks, error }, { data: team }, { data: clients }, { data: ownership }, { data: viewPref }, { data: prefillPost }] = await Promise.all([
+  const [{ data: tasks, error }, { data: team }, { data: clients }, { data: campaigns }, { data: ownership }, { data: viewPref }, { data: prefillPost }] = await Promise.all([
     supabase
       .from('task')
-      .select('id, client_id, content_item_id, task_type, title, owner_id, status, priority, due_date, next_action, notes, estimated_hours, start_date, value, value_client_visible, invoice_status, client:client_id ( name, calendar_colour, status ), owner:owner_id ( full_name ), content:content_item_id ( id, title, client_id, scheduled_at )')
+      .select('id, client_id, content_item_id, task_type, title, owner_id, status, priority, due_date, next_action, notes, estimated_hours, start_date, value, value_client_visible, invoice_status, campaign_id, client:client_id ( name, calendar_colour, status ), owner:owner_id ( full_name ), content:content_item_id ( id, title, client_id, scheduled_at )')
       .order('created_at', { ascending: false }),
     supabase.from('team_member').select('id, full_name, user_id').eq('is_active', true).order('full_name'),
     supabase.from('client').select('id, name, calendar_colour').order('name'),
+    // Open campaigns for the task-modal picker (a closed campaign is history, not a target).
+    supabase.from('campaign').select('id, name, client_id').neq('phase', 'closed').order('created_at', { ascending: false }),
     supabase.from('client_ownership').select('client_id, lead_pm_id'),
     // This user's column preference for the task list (own-row read under RLS).
     supabase.from('user_view_preference').select('config').eq('view_key', 'tasks').maybeSingle(),
@@ -61,6 +63,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     value: t.value,
     value_client_visible: t.value_client_visible ?? false,
     invoice_status: t.invoice_status ?? 'not_invoiced',
+    campaign_id: t.campaign_id ?? null,
     clientName: t.client?.name ?? null,
     clientColour: t.client ? clientColour({ id: t.client_id, calendar_colour: t.client.calendar_colour }) : null,
     ownerName: t.owner?.full_name ?? null,
@@ -80,6 +83,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         tasks={rows}
         teamMembers={(team ?? []).map((m: any) => ({ id: m.id, full_name: m.full_name, user_id: m.user_id }))}
         clients={(clients ?? []).map((c: any) => ({ id: c.id, name: c.name, colour: clientColour(c) }))}
+        campaigns={(campaigns ?? []).map((c: any) => ({ id: c.id, name: c.name, client_id: c.client_id }))}
         leadPmByClient={leadPmByClient}
         currentUserId={access.userId}
         loadError={!!error}

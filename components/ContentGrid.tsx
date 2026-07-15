@@ -318,6 +318,7 @@ type Meta = {
   ad_budget: number | null
   date_posted: string | null
   posted_url: string | null
+  campaign_id: string | null
 }
 
 function metaOf(p: Item): Meta {
@@ -330,6 +331,8 @@ function metaOf(p: Item): Meta {
     ad_budget: p.ad_budget ?? null,
     date_posted: p.date_posted ?? null,
     posted_url: p.posted_url ?? null,
+    // Not surfaced as a grid cell, but set_post_meta overwrites all columns — preserve it.
+    campaign_id: p.campaign_id ?? null,
   }
 }
 

@@ -87,6 +87,8 @@ export type Item = {
   ad_budget?: number | null
   date_posted?: string | null
   posted_url?: string | null
+  // Campaign grouping (0056) — set in the drawer's Production details.
+  campaign_id?: string | null
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']

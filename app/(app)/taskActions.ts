@@ -23,6 +23,7 @@ export type TaskInput = {
   value: number | null
   value_client_visible: boolean
   invoice_status: string
+  campaign_id: string | null
 }
 
 async function authed() {
@@ -49,6 +50,7 @@ function rpcParams(t: TaskInput) {
     p_value: t.value,
     p_value_client_visible: t.value_client_visible,
     p_invoice_status: t.invoice_status,
+    p_campaign_id: t.campaign_id,
   }
 }
 

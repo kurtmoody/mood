@@ -76,6 +76,7 @@ export async function setPostMetaAction(
     ad_budget: number | null
     date_posted: string | null
     posted_url: string | null
+    campaign_id: string | null
   },
 ): Promise<{ error: string | null }> {
   const supabase = await createClient()
@@ -92,6 +93,7 @@ export async function setPostMetaAction(
     p_ad_budget: meta.ad_budget,
     p_date_posted: meta.date_posted,
     p_posted_url: meta.posted_url,
+    p_campaign_id: meta.campaign_id,
   })
   if (error) return { error: rpcErrorMessage(error) }
   revalidatePath('/')
