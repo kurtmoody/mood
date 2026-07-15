@@ -77,7 +77,7 @@ lib/
   taskConstants.ts ownershipRoles.ts colour.ts   # shared constants
   viewColumns.ts           # column-preference mechanism (mergeColumns, 0037)
   exportClient.ts          # client data export → ZIP of CSVs (fflate; RLS-respecting reads)
-migrations/                # numbered SQL (0001–0051) + pgTap *_test.sql  ← source of truth for the DB
+migrations/                # numbered SQL (0001–0057) + pgTap *_test.sql  ← source of truth for the DB
 schema.sql                 # fresh-setup reference ONLY (destructive reset block — never run on live)
 proxy.ts                   # Next 16 middleware → updateSession
 supabase/functions/notify-email/index.ts   # Deno Edge Function: notification → Resend
@@ -345,7 +345,7 @@ draft ──submit_internal──▶ internal_review ──approve_internal─�
 ## 10. Migrations & testing
 
 - Schema changes are **numbered files** `migrations/NNNN_name.sql`, run **manually** in the Supabase SQL editor (not auto-applied). Idempotent: `create … if not exists`, `drop policy if exists` then create, `create or replace`.
-- Currently **0001–0051**. See `PROJECT_GUIDE.md` §15 for the one-line ledger of each. Recent: 0044 timesheets, 0045 task job value, 0046 cost-per-hour, 0047 relocate cost rate to admin-only `agency_internal` (**run after 0046** — migrates from + drops the column it added), 0048 close `client_internal` write side-door + RACI CHECK, 0049 `extend_invite`, 0050 `update_client` preserve status/timezone/currency on omit, 0051 `client_deliverable` table + RPCs.
+- Currently **0001–0057**; next is **0058**. See `PROJECT_GUIDE.md` §15 for the one-line ledger of each. Recent: 0048 close `client_internal` write side-door + RACI CHECK, 0049 `extend_invite`, 0050 `update_client` preserve status/timezone/currency on omit (the named **"preserve-don't-default"** lesson), 0051 `client_deliverable` table + RPCs, 0052 `content_version.visual_content`, 0053 structured `mention` rows on comments/notes, 0054 `content_item_channel` (multi-channel posts) + `set_post_channels`, 0055 `split_post_channel` (+ `post_group_id`), 0056 campaigns (entity + `campaign_id` grouping + client-match rule + hub), 0057 campaign brief/budgets/fee/KPI targets + the approve-before-production intake gate. **Ledger rule:** a param-changing function rebuild drops **both** the old and new signatures before `create` (else `42723` on re-run — 0057 does this); and any temp table read under `set local role authenticated` needs an explicit `grant` (else `42501` — 0056 test 14).
 - Security-sensitive migrations ship a pgTap test `NNNN_*_test.sql`, runnable in the hosted SQL editor (no basejump). Proven pattern:
   - `create extension if not exists pgtap;`
   - temp `_t (seq int, line text)` + `select plan(N);` **before** any role switch.
