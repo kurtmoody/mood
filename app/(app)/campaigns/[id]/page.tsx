@@ -10,6 +10,7 @@ import { computeTimeline, taskCounts } from '@/lib/campaignTimeline'
 import CampaignHeader, { type CampaignDetail } from './CampaignHeader'
 import BriefPanel from './BriefPanel'
 import CampaignTimeline from './CampaignTimeline'
+import MilestonesSection, { type Milestone } from './MilestonesSection'
 
 function taskDate(d: string | null) {
   return d ? new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'
@@ -35,7 +36,7 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
 
   const isAdmin = access.isAgencyAdmin
 
-  const [{ data: campaign }, { data: tasks }, { data: content }] = await Promise.all([
+  const [{ data: campaign }, { data: tasks }, { data: content }, { data: milestones }] = await Promise.all([
     supabase
       .from('campaign')
       .select('id, client_id, name, objective, phase, start_date, end_date, brief, media_budget, fee, kpi_target_results, kpi_target_cost_per_result, brief_approved_at, brief_approved_by, client:client_id ( name )')
@@ -51,6 +52,12 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
       .select('id, client_id, title, status, scheduled_at')
       .eq('campaign_id', id)
       .order('scheduled_at', { ascending: true, nullsFirst: false }),
+    supabase
+      .from('campaign_milestone')
+      .select('id, title, start_date, end_date, status, sort_order')
+      .eq('campaign_id', id)
+      .order('sort_order')
+      .order('created_at'),
   ])
 
   if (!campaign) redirect('/clients')
@@ -88,14 +95,16 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
 
   const taskRows = (tasks ?? []) as { id: string; title: string; status: string; owner: any; start_date: string | null; due_date: string | null }[]
   const contentRows = (content ?? []) as { id: string; client_id: string; title: string | null; status: string; scheduled_at: string | null }[]
+  const milestoneRows = (milestones ?? []) as Milestone[]
 
   const ownerName = (owner: any): string | null => (Array.isArray(owner) ? owner[0]?.full_name : owner?.full_name) ?? null
 
-  // Slice 3: the read-only timeline + progress rollup, both computed from the rows already loaded.
+  // Slice 3/4: the read-only timeline (now with a milestone band) + progress rollup, all from loaded rows.
   const timeline = computeTimeline(
     { start_date: campaign.start_date, end_date: campaign.end_date },
     taskRows.map((t) => ({ id: t.id, title: t.title, status: t.status, ownerName: ownerName(t.owner), start_date: t.start_date, due_date: t.due_date })),
     contentRows.map((c) => ({ id: c.id, title: c.title || 'Untitled', status: c.status, scheduledDate: c.scheduled_at ? maltaDate(c.scheduled_at) : null })),
+    milestoneRows.map((m) => ({ id: m.id, title: m.title, status: m.status, start_date: m.start_date, end_date: m.end_date })),
   )
   const progress = taskCounts(taskRows.map((t) => t.status))
 
@@ -113,6 +122,10 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
 
       <div className="mt-6">
         <CampaignTimeline model={timeline} />
+      </div>
+
+      <div className="mt-8">
+        <MilestonesSection campaignId={detail.id} milestones={milestoneRows} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">

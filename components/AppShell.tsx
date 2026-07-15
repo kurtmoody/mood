@@ -7,7 +7,7 @@ import TopBar from './TopBar'
 
 const STORAGE_KEY = 'mood:sidebar-pinned'
 
-export default function AppShell({ email, isAgency, isAgencyAdmin, children }: { email: string; isAgency: boolean; isAgencyAdmin: boolean; children: ReactNode }) {
+export default function AppShell({ email, isAgency, isClient, isAgencyAdmin, children }: { email: string; isAgency: boolean; isClient: boolean; isAgencyAdmin: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(false) // mobile drawer
   const [pinned, setPinned] = useState(true) // desktop pin (default pinned)
 
@@ -26,7 +26,7 @@ export default function AppShell({ email, isAgency, isAgencyAdmin, children }: {
 
   return (
     <div className="min-h-screen bg-[#FBFBFC] text-[#15171C]">
-      <Sidebar open={open} onClose={() => setOpen(false)} pinned={pinned} onTogglePin={togglePin} isAgency={isAgency} isAgencyAdmin={isAgencyAdmin} />
+      <Sidebar open={open} onClose={() => setOpen(false)} pinned={pinned} onTogglePin={togglePin} isAgency={isAgency} isClient={isClient} isAgencyAdmin={isAgencyAdmin} />
       <div className={`transition-[padding] duration-200 ${pinned ? 'lg:pl-60' : 'lg:pl-16'}`}>
         <TopBar onBurger={() => setOpen(true)} email={email} isAgency={isAgency} />
         <div className="px-4 sm:px-6 lg:px-8 py-6">{children}</div>

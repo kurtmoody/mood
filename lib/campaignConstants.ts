@@ -23,6 +23,16 @@ export const PHASE_LABEL: Record<CampaignPhase, string> = {
   closed: 'Closed',
 }
 
+// Client-friendly wording for the portal. Only production/live/wrapped are ever shown to a
+// client (planning/closed never reach the client surface), so those three are what matter.
+export const CLIENT_PHASE_LABEL: Record<string, string> = {
+  production: 'In production',
+  live: 'Live',
+  wrapped: 'Wrapped up',
+  planning: 'In planning',
+  closed: 'Closed',
+}
+
 // The next phase in the lifecycle, or null when already closed.
 export function nextPhase(phase: string): CampaignPhase | null {
   const i = CAMPAIGN_PHASES.indexOf(phase as CampaignPhase)

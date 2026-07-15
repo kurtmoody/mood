@@ -3,12 +3,40 @@ import { createClient } from '@/lib/supabase/server'
 import { getAccess } from '@/lib/access'
 import PageContainer from '@/components/PageContainer'
 import CampaignsIndex, { type IndexCampaign } from './CampaignsIndex'
+import ClientCampaigns, { type ClientCampaignRow } from './ClientCampaigns'
 
 export default async function CampaignsIndexPage() {
   const supabase = await createClient()
   const access = await getAccess(supabase)
   if (!access) redirect('/login')
-  if (access.type !== 'agency') redirect('/') // internal-only
+
+  // ---- Client portal branch: whitelisted, RPC-only, production/live/wrapped only ----
+  if (access.type === 'client') {
+    const [{ data: clientRows }, ...campaignResults] = await Promise.all([
+      supabase.from('client').select('id, name').in('id', access.clientIds),
+      ...access.clientIds.map((cid) => supabase.rpc('get_client_campaigns', { p_client_id: cid })),
+    ])
+    const nameById = new Map(((clientRows as { id: string; name: string }[] | null) ?? []).map((c) => [c.id, c.name]))
+    const rows: ClientCampaignRow[] = access.clientIds.flatMap((cid, i) =>
+      ((campaignResults[i]?.data as any[] | null) ?? []).map((c) => ({
+        id: c.id,
+        clientId: cid,
+        clientName: nameById.get(cid) ?? 'Your campaigns',
+        name: c.name,
+        phase: c.phase,
+        start_date: c.start_date,
+        end_date: c.end_date,
+        media_budget: c.media_budget,
+      })),
+    )
+    return (
+      <PageContainer>
+        <ClientCampaigns campaigns={rows} multiClient={access.clientIds.length > 1} />
+      </PageContainer>
+    )
+  }
+
+  if (access.type !== 'agency') redirect('/') // 'none'
 
   // All independent — one parallel round. RLS scopes campaign/task to the agency.
   const [{ data: campaigns }, { data: tasks }, { data: clients }] = await Promise.all([

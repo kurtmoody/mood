@@ -19,15 +19,18 @@ export type TLTask = {
 // scheduledDate is a Malta 'YYYY-MM-DD' bucket (the caller derives it from scheduled_at via
 // maltaDate, keeping this module timezone-free like the capacity planner).
 export type TLPost = { id: string; title: string; status: string; scheduledDate: string | null }
+export type TLMilestone = { id: string; title: string; status: string; start_date: string | null; end_date: string | null }
 
 export type TLWeek = { key: string; label: string }
 export type TLBar = { id: string; title: string; ownerName: string | null; status: string; startIndex: number; span: number }
+export type TLMilestoneBar = { id: string; title: string; status: string; startIndex: number; span: number }
 export type TLDot = { id: string; title: string; status: string; index: number; posted: boolean }
 export type TLUnscheduled = { id: string; title: string; ownerName: string | null; status: string }
 export type TLBand = { startIndex: number; endIndex: number }
 
 export type TimelineModel = {
   weeks: TLWeek[]            // empty when there is no dated anchor to build an axis from
+  milestones: TLMilestoneBar[] // the top band (outlined)
   bars: TLBar[]
   dots: TLDot[]
   unscheduled: TLUnscheduled[]
@@ -51,22 +54,24 @@ export function computeTimeline(
   campaign: { start_date: string | null; end_date: string | null },
   tasks: TLTask[],
   posts: TLPost[],
+  milestones: TLMilestone[] = [],
 ): TimelineModel {
   // Honesty bucket first — a task with no dates never disappears (the capacity-planner rule).
   const unscheduled: TLUnscheduled[] = tasks
     .filter((t) => !t.start_date && !t.due_date)
     .map((t) => ({ id: t.id, title: t.title, ownerName: t.ownerName, status: t.status }))
 
-  // Collect every Monday anchor: campaign window + task dates + post weeks.
+  // Collect every Monday anchor: campaign window + milestone dates + task dates + post weeks.
   const anchors: string[] = []
   const push = (d: string | null) => { if (d) anchors.push(mondayOf(d)) }
   push(campaign.start_date); push(campaign.end_date)
+  for (const m of milestones) { push(m.start_date); push(m.end_date) }
   for (const t of tasks) { push(t.start_date); push(t.due_date) }
   for (const p of posts) push(p.scheduledDate)
 
   // No dated anchor → no axis. Still hand back the unscheduled list.
   if (anchors.length === 0) {
-    return { weeks: [], bars: [], dots: [], unscheduled, band: null, truncated: false }
+    return { weeks: [], milestones: [], bars: [], dots: [], unscheduled, band: null, truncated: false }
   }
 
   const earliest = anchors.reduce((a, b) => (a < b ? a : b))
@@ -82,6 +87,22 @@ export function computeTimeline(
   const lastIdx = weeks.length - 1
   // Column index of a date's Monday, clamped into the visible (possibly truncated) window.
   const idx = (d: string) => clamp(weekDiff(earliest, mondayOf(d)), 0, lastIdx)
+
+  // Milestone bars — the top band. Same date convention (both → span; one → single week);
+  // dateless milestones aren't placeable on the axis (they show in the internal list only).
+  const milestoneBars: TLMilestoneBar[] = []
+  for (const m of milestones) {
+    const base = { id: m.id, title: m.title, status: m.status }
+    if (m.start_date && m.end_date) {
+      const s = idx(m.start_date), e = idx(m.end_date)
+      milestoneBars.push({ ...base, startIndex: Math.min(s, e), span: Math.abs(e - s) + 1 })
+    } else if (m.end_date) {
+      milestoneBars.push({ ...base, startIndex: idx(m.end_date), span: 1 })
+    } else if (m.start_date) {
+      milestoneBars.push({ ...base, startIndex: idx(m.start_date), span: 1 })
+    }
+  }
+  milestoneBars.sort((a, b) => a.startIndex - b.startIndex || a.title.localeCompare(b.title))
 
   // Bars — dated tasks. Same convention as the capacity planner: both → span; one → single week.
   const bars: TLBar[] = []
@@ -111,7 +132,7 @@ export function computeTimeline(
       ? { startIndex: idx(campaign.start_date), endIndex: idx(campaign.end_date) }
       : null
 
-  return { weeks, bars, dots, unscheduled, band, truncated }
+  return { weeks, milestones: milestoneBars, bars, dots, unscheduled, band, truncated }
 }
 
 // Complete ÷ total — nothing excluded (On Hold is still work). For the progress rollups.
