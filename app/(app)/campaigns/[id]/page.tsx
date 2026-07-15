@@ -7,6 +7,7 @@ import { STATUS_COLOUR } from '@/lib/taskConstants'
 import { STATUS as CONTENT_STATUS } from '@/components/Calendar'
 import PageContainer from '@/components/PageContainer'
 import CampaignHeader, { type CampaignDetail } from './CampaignHeader'
+import BriefPanel from './BriefPanel'
 
 function taskDate(d: string | null) {
   return d ? new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'
@@ -35,7 +36,7 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
   const [{ data: campaign }, { data: tasks }, { data: content }] = await Promise.all([
     supabase
       .from('campaign')
-      .select('id, client_id, name, objective, phase, start_date, end_date, client:client_id ( name )')
+      .select('id, client_id, name, objective, phase, start_date, end_date, brief, media_budget, fee, kpi_target_results, kpi_target_cost_per_result, brief_approved_at, brief_approved_by, client:client_id ( name )')
       .eq('id', id)
       .maybeSingle(),
     supabase
@@ -52,6 +53,17 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
 
   if (!campaign) redirect('/clients')
 
+  // Resolve the approver's display name from the team directory (brief_approved_by is an auth uid).
+  let approvedByName: string | null = null
+  if (campaign.brief_approved_by) {
+    const { data: approver } = await supabase
+      .from('team_member')
+      .select('full_name')
+      .eq('user_id', campaign.brief_approved_by)
+      .maybeSingle()
+    approvedByName = approver?.full_name ?? null
+  }
+
   const cli = (campaign as any).client
   const detail: CampaignDetail = {
     id: campaign.id,
@@ -62,6 +74,14 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
     phase: campaign.phase,
     start_date: campaign.start_date,
     end_date: campaign.end_date,
+    brief: campaign.brief,
+    media_budget: campaign.media_budget,
+    fee: campaign.fee,
+    kpi_target_results: campaign.kpi_target_results,
+    kpi_target_cost_per_result: campaign.kpi_target_cost_per_result,
+    brief_approved_at: campaign.brief_approved_at,
+    brief_approved_by: campaign.brief_approved_by,
+    approvedByName,
   }
 
   const taskRows = (tasks ?? []) as { id: string; title: string; status: string; owner: any; due_date: string | null }[]
@@ -74,6 +94,10 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
       </div>
 
       <CampaignHeader campaign={detail} isAdmin={isAdmin} />
+
+      <div className="mt-6">
+        <BriefPanel campaign={detail} />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
         {/* Tasks */}

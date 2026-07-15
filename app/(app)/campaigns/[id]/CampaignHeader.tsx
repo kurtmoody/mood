@@ -17,6 +17,14 @@ export type CampaignDetail = {
   phase: string
   start_date: string | null
   end_date: string | null
+  brief: string | null
+  media_budget: number | null
+  fee: number | null
+  kpi_target_results: number | null
+  kpi_target_cost_per_result: number | null
+  brief_approved_at: string | null
+  brief_approved_by: string | null
+  approvedByName: string | null
 }
 
 function fmtDate(d: string | null) {
@@ -52,6 +60,12 @@ export default function CampaignHeader({ campaign, isAdmin }: { campaign: Campai
       phase: next,
       start_date: campaign.start_date,
       end_date: campaign.end_date,
+      // Full-overwrite: carry the brief/money/targets through unchanged.
+      brief: campaign.brief,
+      media_budget: campaign.media_budget,
+      fee: campaign.fee,
+      kpi_target_results: campaign.kpi_target_results,
+      kpi_target_cost_per_result: campaign.kpi_target_cost_per_result,
     })
     setBusy(false)
     if (r.error) { setError(r.error); return }

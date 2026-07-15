@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useActionState, useEffect, useRef } from 'react'
 import { createCampaignAction, type CampaignState } from '../../campaignActions'
-import { CAMPAIGN_OBJECTIVES, CAMPAIGN_PHASES, OBJECTIVE_LABEL, PHASE_LABEL, type CampaignObjective, type CampaignPhase } from '@/lib/campaignConstants'
+import { CAMPAIGN_OBJECTIVES, OBJECTIVE_LABEL, PHASE_LABEL, type CampaignObjective, type CampaignPhase } from '@/lib/campaignConstants'
 import { labelCls, fieldCls, btnPrimary } from '@/components/ui'
 
 export type Campaign = {
@@ -71,8 +71,9 @@ function AddCampaignForm({ clientId }: { clientId: string }) {
         </div>
         <div>
           <label className={labelCls}>Phase</label>
+          {/* Only planning/closed at creation — production onward needs an approved brief (0057 gate). */}
           <select name="phase" defaultValue="planning" className={fieldCls}>
-            {CAMPAIGN_PHASES.map((p) => <option key={p} value={p}>{PHASE_LABEL[p as CampaignPhase]}</option>)}
+            {(['planning', 'closed'] as const).map((p) => <option key={p} value={p}>{PHASE_LABEL[p]}</option>)}
           </select>
         </div>
         <div>
@@ -82,6 +83,26 @@ function AddCampaignForm({ clientId }: { clientId: string }) {
         <div>
           <label className={labelCls}>End date</label>
           <input name="end_date" type="date" className={fieldCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Media budget (€)</label>
+          <input name="media_budget" type="number" min="0" step="any" className={fieldCls} placeholder="1000" />
+        </div>
+        <div>
+          <label className={labelCls}>Fee (€) <span className="text-[#9398A1] normal-case">· internal</span></label>
+          <input name="fee" type="number" min="0" step="any" className={fieldCls} placeholder="5000" />
+        </div>
+        <div>
+          <label className={labelCls}>KPI target (results)</label>
+          <input name="kpi_target_results" type="number" min="0" step="any" className={fieldCls} placeholder="200" />
+        </div>
+        <div>
+          <label className={labelCls}>Target cost / result (€)</label>
+          <input name="kpi_target_cost_per_result" type="number" min="0" step="any" className={fieldCls} placeholder="20" />
+        </div>
+        <div className="col-span-2">
+          <label className={labelCls}>Brief</label>
+          <textarea name="brief" rows={3} className={fieldCls} placeholder="Goals, audience, messaging, deliverables…" />
         </div>
       </div>
       {state.error && <p className="text-sm text-red-600 mt-3">{state.error}</p>}

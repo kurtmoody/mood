@@ -29,3 +29,25 @@ export function nextPhase(phase: string): CampaignPhase | null {
   if (i < 0 || i >= CAMPAIGN_PHASES.length - 1) return null
   return CAMPAIGN_PHASES[i + 1]
 }
+
+// The unit a KPI counts, keyed by objective, so a target reads naturally ("leads", "sales").
+const RESULT_UNIT: Record<CampaignObjective, string> = {
+  awareness: 'view',
+  traffic: 'click',
+  leads: 'lead',
+  conversions: 'conversion',
+  sales: 'sale',
+}
+
+// One-line KPI target, e.g. "200 leads · ≤ €20/lead". Null when no target is set.
+export function kpiLine(
+  results: number | null,
+  costPerResult: number | null,
+  objective: string | null,
+): string | null {
+  const unit = RESULT_UNIT[objective as CampaignObjective] ?? 'result'
+  const parts: string[] = []
+  if (results != null) parts.push(`${results} ${unit}${results === 1 ? '' : 's'}`)
+  if (costPerResult != null) parts.push(`≤ €${costPerResult}/${unit}`)
+  return parts.length ? parts.join(' · ') : null
+}

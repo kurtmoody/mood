@@ -13,6 +13,24 @@ function str(fd: FormData, k: string) {
   return v === '' ? null : v
 }
 
+function num(fd: FormData, k: string): number | null {
+  const v = (fd.get(k) as string | null)?.trim() ?? ''
+  if (v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+// The brief/money/target fields — sent whole on every write (documented full-overwrite).
+function briefParams(fd: FormData) {
+  return {
+    p_brief: str(fd, 'brief'),
+    p_media_budget: num(fd, 'media_budget'),
+    p_fee: num(fd, 'fee'),
+    p_kpi_target_results: num(fd, 'kpi_target_results'),
+    p_kpi_target_cost_per_result: num(fd, 'kpi_target_cost_per_result'),
+  }
+}
+
 async function authed() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -48,6 +66,7 @@ export async function createCampaignAction(_prev: CampaignState, fd: FormData): 
     p_phase: ph.value,
     p_start_date: str(fd, 'start_date'),
     p_end_date: str(fd, 'end_date'),
+    ...briefParams(fd),
   })
   if (error) return { error: rpcErrorMessage(error), ok: false }
 
@@ -73,6 +92,7 @@ export async function updateCampaignAction(_prev: CampaignState, fd: FormData): 
     p_phase: ph.value,
     p_start_date: str(fd, 'start_date'),
     p_end_date: str(fd, 'end_date'),
+    ...briefParams(fd),
   })
   if (error) return { error: rpcErrorMessage(error), ok: false }
 
@@ -82,10 +102,23 @@ export async function updateCampaignAction(_prev: CampaignState, fd: FormData): 
   return { error: null, ok: true }
 }
 
-// Direct-call (no form) — used by the hub's phase-advance control.
+// Direct-call (no form) — used by the hub's phase-advance control. update_campaign is
+// full-overwrite, so we forward the WHOLE current field set (incl. brief/money/targets),
+// changing only the phase — otherwise advancing would wipe the brief.
 export async function setCampaignPhaseAction(
   campaignId: string,
-  next: { name: string; objective: string | null; phase: string; start_date: string | null; end_date: string | null },
+  next: {
+    name: string
+    objective: string | null
+    phase: string
+    start_date: string | null
+    end_date: string | null
+    brief: string | null
+    media_budget: number | null
+    fee: number | null
+    kpi_target_results: number | null
+    kpi_target_cost_per_result: number | null
+  },
 ): Promise<{ error: string | null }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -99,7 +132,24 @@ export async function setCampaignPhaseAction(
     p_phase: next.phase,
     p_start_date: next.start_date,
     p_end_date: next.end_date,
+    p_brief: next.brief,
+    p_media_budget: next.media_budget,
+    p_fee: next.fee,
+    p_kpi_target_results: next.kpi_target_results,
+    p_kpi_target_cost_per_result: next.kpi_target_cost_per_result,
   })
+  if (error) return { error: rpcErrorMessage(error) }
+  revalidatePath(`/campaigns/${campaignId}`)
+  return { error: null }
+}
+
+// Reversible brief approval — the intake gate for production. Agency-member level (RPC-enforced).
+export async function setBriefApprovedAction(campaignId: string, approved: boolean): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not signed in.' }
+
+  const { error } = await supabase.rpc('set_brief_approved', { p_id: campaignId, p_approved: approved })
   if (error) return { error: rpcErrorMessage(error) }
   revalidatePath(`/campaigns/${campaignId}`)
   return { error: null }
