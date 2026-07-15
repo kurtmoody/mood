@@ -59,7 +59,7 @@ export async function createCampaignAction(_prev: CampaignState, fd: FormData): 
   const ph = phase(fd)
   if (!ph.valid) return { error: 'Choose a valid phase.', ok: false }
 
-  const { error } = await supabase.rpc('create_campaign', {
+  const { data: newId, error } = await supabase.rpc('create_campaign', {
     p_client_id: clientId,
     p_name: name,
     p_objective: obj.value,
@@ -72,6 +72,15 @@ export async function createCampaignAction(_prev: CampaignState, fd: FormData): 
 
   revalidatePath(`/clients/${clientId}`)
   revalidatePath('/campaigns')
+
+  // Spawn from template (slice 5) → land on the hub so the spawned plan is visible on the timeline.
+  const templateId = str(fd, 'template_id')
+  if (templateId && newId) {
+    const { error: spawnErr } = await supabase.rpc('spawn_campaign_tasks', { p_campaign_id: newId as string, p_template_id: templateId })
+    if (spawnErr) return { error: `Campaign created, but the template didn't apply: ${rpcErrorMessage(spawnErr)}`, ok: false }
+    redirect(`/campaigns/${newId as string}`)
+  }
+
   return { error: null, ok: true }
 }
 

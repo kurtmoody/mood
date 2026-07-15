@@ -99,7 +99,10 @@ export default function CampaignsIndex({ campaigns, clients }: { campaigns: Inde
           <div className="text-xl font-bold">Campaigns</div>
           <div className="text-sm text-[#5A5E66]">{visible.length} {visible.length === 1 ? 'campaign' : 'campaigns'}</div>
         </div>
-        <button onClick={() => setCreating(true)} className={btnPrimary}>New campaign</button>
+        <div className="flex items-center gap-4">
+          <Link href="/templates" className="text-sm text-[#5A5E66] hover:underline">Templates</Link>
+          <button onClick={() => setCreating(true)} className={btnPrimary}>New campaign</button>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">

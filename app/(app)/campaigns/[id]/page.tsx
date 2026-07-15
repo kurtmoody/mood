@@ -11,6 +11,7 @@ import CampaignHeader, { type CampaignDetail } from './CampaignHeader'
 import BriefPanel from './BriefPanel'
 import CampaignTimeline from './CampaignTimeline'
 import MilestonesSection, { type Milestone } from './MilestonesSection'
+import ApplyTemplate, { type TemplateOption } from './ApplyTemplate'
 
 function taskDate(d: string | null) {
   return d ? new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'
@@ -36,7 +37,7 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
 
   const isAdmin = access.isAgencyAdmin
 
-  const [{ data: campaign }, { data: tasks }, { data: content }, { data: milestones }] = await Promise.all([
+  const [{ data: campaign }, { data: tasks }, { data: content }, { data: milestones }, { data: templates }, { data: spawns }] = await Promise.all([
     supabase
       .from('campaign')
       .select('id, client_id, name, objective, phase, start_date, end_date, brief, media_budget, fee, kpi_target_results, kpi_target_cost_per_result, brief_approved_at, brief_approved_by, client:client_id ( name )')
@@ -58,6 +59,8 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
       .eq('campaign_id', id)
       .order('sort_order')
       .order('created_at'),
+    supabase.from('campaign_template').select('id, name, objective').order('name'),
+    supabase.from('campaign_template_spawn').select('template_id').eq('campaign_id', id),
   ])
 
   if (!campaign) redirect('/clients')
@@ -120,7 +123,15 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
         <BriefPanel campaign={detail} />
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 flex justify-end">
+        <ApplyTemplate
+          campaignId={detail.id}
+          templates={(templates as TemplateOption[] | null) ?? []}
+          appliedIds={((spawns as { template_id: string }[] | null) ?? []).map((s) => s.template_id)}
+        />
+      </div>
+
+      <div className="mt-2">
         <CampaignTimeline model={timeline} />
       </div>
 
