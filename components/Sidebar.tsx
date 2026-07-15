@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Calendar, LayoutDashboard, ListChecks, Users, Users2, Settings, LineChart, Pin, type LucideIcon } from 'lucide-react'
+import { Calendar, LayoutDashboard, ListChecks, Users, Users2, Megaphone, Settings, LineChart, Pin, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type NavItem = { href: string; label: string; icon: LucideIcon; isActive: (path: string) => boolean; agencyOnly?: boolean; adminOnly?: boolean }
@@ -14,6 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/tasks', label: 'Tasks', icon: ListChecks, isActive: (p) => p === '/tasks' || p.startsWith('/tasks/'), agencyOnly: true },
   { href: '/clients', label: 'Clients', icon: Users, isActive: (p) => p === '/clients' || p.startsWith('/clients/'), agencyOnly: true },
   { href: '/team', label: 'Team', icon: Users2, isActive: (p) => p === '/team' || p.startsWith('/team/'), agencyOnly: true },
+  { href: '/campaigns', label: 'Campaigns', icon: Megaphone, isActive: (p) => p === '/campaigns' || p.startsWith('/campaigns/'), agencyOnly: true },
   { href: '/reports', label: 'Reports', icon: LineChart, isActive: (p) => p === '/reports', agencyOnly: true },
   { href: '/admin', label: 'Admin', icon: Settings, isActive: (p) => p === '/admin' || p.startsWith('/admin/'), adminOnly: true },
 ]

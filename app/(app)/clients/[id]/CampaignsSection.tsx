@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import { useActionState, useEffect, useRef } from 'react'
 import { createCampaignAction, type CampaignState } from '../../campaignActions'
-import { CAMPAIGN_OBJECTIVES, OBJECTIVE_LABEL, PHASE_LABEL, type CampaignObjective, type CampaignPhase } from '@/lib/campaignConstants'
-import { labelCls, fieldCls, btnPrimary } from '@/components/ui'
+import CampaignFormFields from '../../CampaignFormFields'
+import { OBJECTIVE_LABEL, PHASE_LABEL, type CampaignObjective, type CampaignPhase } from '@/lib/campaignConstants'
+import { btnPrimary } from '@/components/ui'
 
 export type Campaign = {
   id: string
@@ -59,54 +60,7 @@ function AddCampaignForm({ clientId }: { clientId: string }) {
     <form ref={ref} action={action} className="border border-[#ECECEE] rounded-2xl bg-white p-5">
       <div className="text-sm font-semibold mb-4">New campaign</div>
       <input type="hidden" name="client_id" value={clientId} />
-      <div className="grid grid-cols-2 gap-3">
-        <div className="col-span-2">
-          <label className={labelCls}>Name *</label>
-          <input name="name" required className={fieldCls} placeholder="Summer launch" />
-        </div>
-        <div>
-          <label className={labelCls}>Objective</label>
-          <select name="objective" defaultValue="" className={fieldCls}>
-            <option value="">—</option>
-            {CAMPAIGN_OBJECTIVES.map((o) => <option key={o} value={o}>{OBJECTIVE_LABEL[o as CampaignObjective]}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={labelCls}>Phase</label>
-          {/* Only planning/closed at creation — production onward needs an approved brief (0057 gate). */}
-          <select name="phase" defaultValue="planning" className={fieldCls}>
-            {(['planning', 'closed'] as const).map((p) => <option key={p} value={p}>{PHASE_LABEL[p]}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={labelCls}>Start date</label>
-          <input name="start_date" type="date" className={fieldCls} />
-        </div>
-        <div>
-          <label className={labelCls}>End date</label>
-          <input name="end_date" type="date" className={fieldCls} />
-        </div>
-        <div>
-          <label className={labelCls}>Media budget (€)</label>
-          <input name="media_budget" type="number" min="0" step="any" className={fieldCls} placeholder="1000" />
-        </div>
-        <div>
-          <label className={labelCls}>Fee (€) <span className="text-[#9398A1] normal-case">· internal</span></label>
-          <input name="fee" type="number" min="0" step="any" className={fieldCls} placeholder="5000" />
-        </div>
-        <div>
-          <label className={labelCls}>KPI target (results)</label>
-          <input name="kpi_target_results" type="number" min="0" step="any" className={fieldCls} placeholder="200" />
-        </div>
-        <div>
-          <label className={labelCls}>Target cost / result (€)</label>
-          <input name="kpi_target_cost_per_result" type="number" min="0" step="any" className={fieldCls} placeholder="20" />
-        </div>
-        <div className="col-span-2">
-          <label className={labelCls}>Brief</label>
-          <textarea name="brief" rows={3} className={fieldCls} placeholder="Goals, audience, messaging, deliverables…" />
-        </div>
-      </div>
+      <CampaignFormFields />
       {state.error && <p className="text-sm text-red-600 mt-3">{state.error}</p>}
       <div className="mt-4">
         <button type="submit" disabled={pending} className={btnPrimary}>

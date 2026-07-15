@@ -71,6 +71,7 @@ export async function createCampaignAction(_prev: CampaignState, fd: FormData): 
   if (error) return { error: rpcErrorMessage(error), ok: false }
 
   revalidatePath(`/clients/${clientId}`)
+  revalidatePath('/campaigns')
   return { error: null, ok: true }
 }
 

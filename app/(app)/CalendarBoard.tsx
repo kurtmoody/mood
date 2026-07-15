@@ -9,6 +9,7 @@ import type { ColumnConfig } from '@/lib/viewColumns'
 import FilterMenu from '@/components/FilterMenu'
 import Drawer from '@/components/Drawer'
 import NewPostForm from './NewPostForm'
+import NewMenu from './NewMenu'
 import { transitionPostAction } from './approvalActions'
 import { addCommentAction, deleteCommentAction } from './commentActions'
 import { updatePostAction, reschedulePostAction } from './postActions'
@@ -259,12 +260,11 @@ export default function CalendarBoard({
             <button onClick={next} aria-label="Next" className="px-2.5 py-2 hover:bg-[#F4F4F6]">›</button>
           </div>
           {isAgency && (
-            <button
-              onClick={() => setFormDate('')}
-              className={`${btnPrimary} shrink-0`}
-            >
-              New post
-            </button>
+            <NewMenu
+              clients={clients.map((c) => ({ id: c.id, name: c.name }))}
+              defaultClientId={selectedClientIds.length === 1 ? selectedClientIds[0] : ''}
+              onNewPost={() => setFormDate('')}
+            />
           )}
         </div>
       </div>
