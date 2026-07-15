@@ -13,6 +13,8 @@ export type Campaign = {
   phase: string
   start_date: string | null
   end_date: string | null
+  taskComplete: number
+  taskTotal: number
 }
 
 const initial: CampaignState = { error: null, ok: false }
@@ -128,6 +130,7 @@ function CampaignRow({ campaign }: { campaign: Campaign }) {
         <PhasePill phase={campaign.phase} />
       </div>
       <div className="flex items-center gap-3 shrink-0 text-xs text-[#9398A1]">
+        {campaign.taskTotal > 0 && <span>{campaign.taskComplete}/{campaign.taskTotal} tasks</span>}
         {obj && <span className="text-[#5A5E66]">{OBJECTIVE_LABEL[obj]}</span>}
         {range && <span>{range}</span>}
       </div>

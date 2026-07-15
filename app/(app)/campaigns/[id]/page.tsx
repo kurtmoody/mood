@@ -6,8 +6,10 @@ import { mondayOf, maltaDate } from '@/lib/week'
 import { STATUS_COLOUR } from '@/lib/taskConstants'
 import { STATUS as CONTENT_STATUS } from '@/components/Calendar'
 import PageContainer from '@/components/PageContainer'
+import { computeTimeline, taskCounts } from '@/lib/campaignTimeline'
 import CampaignHeader, { type CampaignDetail } from './CampaignHeader'
 import BriefPanel from './BriefPanel'
+import CampaignTimeline from './CampaignTimeline'
 
 function taskDate(d: string | null) {
   return d ? new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'
@@ -41,7 +43,7 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
       .maybeSingle(),
     supabase
       .from('task')
-      .select('id, title, status, owner:owner_id ( full_name ), due_date')
+      .select('id, title, status, owner:owner_id ( full_name ), start_date, due_date')
       .eq('campaign_id', id)
       .order('due_date', { ascending: true, nullsFirst: false }),
     supabase
@@ -84,8 +86,18 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
     approvedByName,
   }
 
-  const taskRows = (tasks ?? []) as { id: string; title: string; status: string; owner: any; due_date: string | null }[]
+  const taskRows = (tasks ?? []) as { id: string; title: string; status: string; owner: any; start_date: string | null; due_date: string | null }[]
   const contentRows = (content ?? []) as { id: string; client_id: string; title: string | null; status: string; scheduled_at: string | null }[]
+
+  const ownerName = (owner: any): string | null => (Array.isArray(owner) ? owner[0]?.full_name : owner?.full_name) ?? null
+
+  // Slice 3: the read-only timeline + progress rollup, both computed from the rows already loaded.
+  const timeline = computeTimeline(
+    { start_date: campaign.start_date, end_date: campaign.end_date },
+    taskRows.map((t) => ({ id: t.id, title: t.title, status: t.status, ownerName: ownerName(t.owner), start_date: t.start_date, due_date: t.due_date })),
+    contentRows.map((c) => ({ id: c.id, title: c.title || 'Untitled', status: c.status, scheduledDate: c.scheduled_at ? maltaDate(c.scheduled_at) : null })),
+  )
+  const progress = taskCounts(taskRows.map((t) => t.status))
 
   return (
     <PageContainer>
@@ -93,10 +105,14 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
         <Link href={`/clients/${detail.client_id}`} className="text-sm text-[#5A5E66] hover:underline">← {detail.clientName}</Link>
       </div>
 
-      <CampaignHeader campaign={detail} isAdmin={isAdmin} />
+      <CampaignHeader campaign={detail} isAdmin={isAdmin} taskComplete={progress.complete} taskTotal={progress.total} />
 
       <div className="mt-6">
         <BriefPanel campaign={detail} />
+      </div>
+
+      <div className="mt-6">
+        <CampaignTimeline model={timeline} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">

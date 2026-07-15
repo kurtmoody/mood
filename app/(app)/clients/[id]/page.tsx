@@ -47,6 +47,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
     { data: assets },
     { data: deliverables },
     { data: campaigns },
+    { data: campaignTasks },
     { data: ownership },
     { data: invites },
   ] = await Promise.all([
@@ -76,6 +77,8 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
       .select('id, name, objective, phase, start_date, end_date')
       .eq('client_id', id)
       .order('created_at', { ascending: false }),
+    // Task counts per campaign for the list rows — one query, grouped in JS (no N+1).
+    supabase.from('task').select('campaign_id, status').eq('client_id', id).not('campaign_id', 'is', null),
     supabase
       .from('client_ownership')
       .select('lead_pm_id, comms_backup_id, creative_lead_id, design_owner_id, content_owner_id, video_owner_id, sales_ops_id, intern_support_id')
@@ -91,6 +94,21 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
   ])
 
   if (!client) redirect('/clients')
+
+  // Fold the per-campaign task counts (Complete ÷ total) onto the campaign rows.
+  const taskAgg = new Map<string, { complete: number; total: number }>()
+  for (const t of (campaignTasks as { campaign_id: string | null; status: string }[] | null) ?? []) {
+    if (!t.campaign_id) continue
+    const e = taskAgg.get(t.campaign_id) ?? { complete: 0, total: 0 }
+    e.total++
+    if (t.status === 'Complete') e.complete++
+    taskAgg.set(t.campaign_id, e)
+  }
+  const campaignRows: Campaign[] = ((campaigns as any[] | null) ?? []).map((c) => ({
+    ...c,
+    taskComplete: taskAgg.get(c.id)?.complete ?? 0,
+    taskTotal: taskAgg.get(c.id)?.total ?? 0,
+  }))
 
   const ciRaw = (client as { client_internal: Internal | Internal[] | null }).client_internal
   const ci = (Array.isArray(ciRaw) ? ciRaw[0] : ciRaw) ?? null
@@ -138,7 +156,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
       </div>
 
       <div className="max-w-[680px] mt-10">
-        <CampaignsSection clientId={client.id} campaigns={(campaigns as Campaign[] | null) ?? []} />
+        <CampaignsSection clientId={client.id} campaigns={campaignRows} />
       </div>
 
       <div className="max-w-[680px] mt-10">

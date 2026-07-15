@@ -42,7 +42,7 @@ function dateRange(start: string | null, end: string | null): string {
 
 const deleteInitial: CampaignState = { error: null, ok: false }
 
-export default function CampaignHeader({ campaign, isAdmin }: { campaign: CampaignDetail; isAdmin: boolean }) {
+export default function CampaignHeader({ campaign, isAdmin, taskComplete, taskTotal }: { campaign: CampaignDetail; isAdmin: boolean; taskComplete: number; taskTotal: number }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -88,6 +88,22 @@ export default function CampaignHeader({ campaign, isAdmin }: { campaign: Campai
           <div className="flex items-center gap-4 mt-3 text-sm text-[#5A5E66]">
             <span>{obj ? OBJECTIVE_LABEL[obj] : <span className="text-[#9398A1]">No objective</span>}</span>
             <span className="text-[#9398A1]">{dateRange(campaign.start_date, campaign.end_date)}</span>
+          </div>
+          {/* Task progress rollup — Complete ÷ total (On Hold counts; it's still work). */}
+          <div className="mt-4 max-w-[280px]">
+            {taskTotal === 0 ? (
+              <div className="text-xs text-[#9398A1]">No tasks yet</div>
+            ) : (
+              <>
+                <div className="flex items-baseline justify-between text-xs text-[#5A5E66] mb-1">
+                  <span>{taskComplete} of {taskTotal} tasks complete</span>
+                  <span className="text-[#9398A1]">{Math.round((taskComplete / taskTotal) * 100)}%</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-[#F0F0F1] overflow-hidden">
+                  <div className="h-full rounded-full bg-[#16A34A]" style={{ width: `${(taskComplete / taskTotal) * 100}%` }} />
+                </div>
+              </>
+            )}
           </div>
         </div>
         <div className="shrink-0 flex flex-col items-end gap-2">
