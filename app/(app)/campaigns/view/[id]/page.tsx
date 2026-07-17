@@ -30,6 +30,32 @@ function cap(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+function money(n: number | null): string {
+  return n == null ? '—' : `€${n.toLocaleString('en-GB', { maximumFractionDigits: 2 })}`
+}
+function count(n: number | null): string {
+  return n == null ? '—' : n.toLocaleString('en-GB')
+}
+
+// A plain progress meter (server-safe — no hooks).
+function Meter({ pct }: { pct: number }) {
+  return (
+    <div className="h-1.5 rounded-full bg-[#F0F0F1] overflow-hidden mt-2">
+      <div className="h-full rounded-full bg-[#16A34A]" style={{ width: `${Math.min(pct, 100)}%` }} />
+    </div>
+  )
+}
+
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: React.ReactNode }) {
+  return (
+    <div className="border border-[#ECECEE] rounded-2xl bg-white p-5">
+      <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">{label}</div>
+      <div className="text-2xl font-bold">{value}</div>
+      {sub && <div className="text-xs text-[#9398A1] mt-1">{sub}</div>}
+    </div>
+  )
+}
+
 // The client-facing campaign page. Campaign fields come ONLY from get_client_campaign (whitelist:
 // no fee/brief/kpi). Milestones come via their RLS (client can read their campaigns' milestones).
 // Posted-for-you content reuses the 0015 content read floor (clients can read `posted` items).
@@ -88,14 +114,42 @@ export default async function ClientCampaignPage({ params }: { params: Promise<{
         <div className="text-sm text-[#9398A1] mt-2">{dateRange(campaign.start_date, campaign.end_date)}</div>
       </div>
 
+      {/* Stat row — budget · spend · results · cost per result (whitelisted RPC columns only) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+        <StatCard
+          label="Agreed ad budget"
+          value={campaign.media_budget != null ? money(Number(campaign.media_budget)) : 'Not set'}
+        />
+        <StatCard
+          label="Spent so far"
+          value={money(Number(campaign.spent ?? 0))}
+          sub={campaign.media_budget != null && Number(campaign.media_budget) > 0
+            ? <Meter pct={(Number(campaign.spent ?? 0) / Number(campaign.media_budget)) * 100} />
+            : undefined}
+        />
+        <StatCard
+          label="Results so far"
+          value={count(Number(campaign.results ?? 0))}
+          sub={campaign.kpi_target_results != null
+            ? (Number(campaign.kpi_target_results) > 0
+                ? <><span>of {count(Number(campaign.kpi_target_results))} target</span><Meter pct={(Number(campaign.results ?? 0) / Number(campaign.kpi_target_results)) * 100} /></>
+                : `of ${count(Number(campaign.kpi_target_results))} target`)
+            : undefined}
+        />
+        <StatCard
+          label="Cost per result"
+          value={Number(campaign.results ?? 0) > 0 ? money(Number(campaign.spent ?? 0) / Number(campaign.results)) : '—'}
+        />
+      </div>
+
       {/* Milestone timeline */}
       <div className="mt-6">
         <CampaignTimeline model={timeline} showPosts={false} title="Milestones" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+      <div className="mt-6">
         {/* Posted for you */}
-        <section className="lg:col-span-2">
+        <section>
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="text-lg font-bold">Posted for you</h2>
             <span className="text-sm text-[#9398A1]">{postedRows.length}</span>
@@ -128,18 +182,6 @@ export default async function ClientCampaignPage({ params }: { params: Promise<{
               })}
             </div>
           )}
-        </section>
-
-        {/* Agreed ad budget */}
-        <section>
-          <h2 className="text-lg font-bold mb-3">Ad budget</h2>
-          <div className="border border-[#ECECEE] rounded-2xl bg-white p-6">
-            <div className="text-[11px] uppercase tracking-wide text-[#9398A1] font-semibold mb-1">Agreed ad budget</div>
-            <div className="text-2xl font-bold">
-              {campaign.media_budget != null ? `€${Number(campaign.media_budget).toLocaleString('en-GB')}` : <span className="text-[#9398A1] text-base font-normal">Not set</span>}
-            </div>
-            <p className="text-xs text-[#9398A1] mt-3">Spend and results will appear here as the campaign runs.</p>
-          </div>
         </section>
       </div>
     </PageContainer>

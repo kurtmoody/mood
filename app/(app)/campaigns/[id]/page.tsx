@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getAccess } from '@/lib/access'
-import { mondayOf, maltaDate } from '@/lib/week'
+import { mondayOf, maltaDate, todayMalta } from '@/lib/week'
 import { STATUS_COLOUR } from '@/lib/taskConstants'
 import { STATUS as CONTENT_STATUS } from '@/components/Calendar'
 import PageContainer from '@/components/PageContainer'
@@ -12,6 +12,8 @@ import BriefPanel from './BriefPanel'
 import CampaignTimeline from './CampaignTimeline'
 import MilestonesSection, { type Milestone } from './MilestonesSection'
 import ApplyTemplate, { type TemplateOption } from './ApplyTemplate'
+import ResultsPanel, { type Metric } from './ResultsPanel'
+import MetaSyncPanel, { type MetaSync } from './MetaSyncPanel'
 
 function taskDate(d: string | null) {
   return d ? new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'
@@ -37,10 +39,10 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
 
   const isAdmin = access.isAgencyAdmin
 
-  const [{ data: campaign }, { data: tasks }, { data: content }, { data: milestones }, { data: templates }, { data: spawns }] = await Promise.all([
+  const [{ data: campaign }, { data: tasks }, { data: content }, { data: milestones }, { data: templates }, { data: spawns }, { data: metrics }] = await Promise.all([
     supabase
       .from('campaign')
-      .select('id, client_id, name, objective, phase, start_date, end_date, brief, media_budget, fee, kpi_target_results, kpi_target_cost_per_result, brief_approved_at, brief_approved_by, client:client_id ( name )')
+      .select('id, client_id, name, objective, phase, start_date, end_date, brief, media_budget, fee, kpi_target_results, kpi_target_cost_per_result, brief_approved_at, brief_approved_by, meta_campaign_ids, meta_results_action, meta_last_synced_at, meta_sync_error, client:client_id ( name )')
       .eq('id', id)
       .maybeSingle(),
     supabase
@@ -61,6 +63,12 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
       .order('created_at'),
     supabase.from('campaign_template').select('id, name, objective').order('name'),
     supabase.from('campaign_template_spawn').select('template_id').eq('campaign_id', id),
+    supabase
+      .from('campaign_metric')
+      .select('id, platform, period_start, period_end, spend, impressions, reach, clicks, results, source, note')
+      .eq('campaign_id', id)
+      .order('period_start', { ascending: true })
+      .order('platform'),
   ])
 
   if (!campaign) redirect('/clients')
@@ -111,6 +119,14 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
   )
   const progress = taskCounts(taskRows.map((t) => t.status))
 
+  const metaSync: MetaSync = {
+    campaignId: detail.id,
+    metaCampaignIds: (campaign.meta_campaign_ids as string[] | null) ?? [],
+    resultsAction: campaign.meta_results_action ?? null,
+    lastSyncedAt: campaign.meta_last_synced_at ?? null,
+    syncError: campaign.meta_sync_error ?? null,
+  }
+
   return (
     <PageContainer>
       <div className="mb-4">
@@ -121,6 +137,23 @@ export default async function CampaignHubPage({ params }: { params: Promise<{ id
 
       <div className="mt-6">
         <BriefPanel campaign={detail} />
+      </div>
+
+      <div className="mt-6">
+        <ResultsPanel
+          campaignId={detail.id}
+          budget={detail.media_budget}
+          targetResults={detail.kpi_target_results}
+          targetCpr={detail.kpi_target_cost_per_result}
+          startDate={detail.start_date}
+          endDate={detail.end_date}
+          today={todayMalta()}
+          metrics={(metrics as Metric[] | null) ?? []}
+        />
+      </div>
+
+      <div className="mt-6">
+        <MetaSyncPanel sync={metaSync} />
       </div>
 
       <div className="mt-6 flex justify-end">
